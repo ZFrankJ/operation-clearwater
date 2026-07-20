@@ -2,6 +2,19 @@
 
 Operation Clearwater is a self-contained 3D tactical story FPS set at Ridgewatch, the municipal waterworks serving 218,000 people on the fictional island of Oris.
 
+## Play online
+
+**[Launch Operation Clearwater](https://operation-clearwater.pages.dev/)** in a
+modern desktop browser. The Cloudflare Pages edition is the complete game and
+does not require installation.
+
+## Creation credit
+
+Operation Clearwater was fully assembled, programmed, written, and iterated by
+**OpenAI GPT-5.6-sol**, under the creative direction and playtesting of Fujia
+Zhang. The game uses properly attributed third-party models, textures, audio,
+and libraries listed in [License and attribution](#license-and-attribution).
+
 An armed terrorist cell has stolen municipal guardian uniforms and occupied the supply plant. Eighteen disguised guards protect two specialists: a poison technician preparing the dosing machine and a vault technician working to defeat the city-supply valve. If a specialist falls, any surviving hostile can replace them, but the work advances only while an operator is within 1.35 metres of the relevant controls. A Global Hawk EO/IR pass opens the operation by identifying all twenty people and marking the valve vault, injection machine, and emergency demolition point. Coast Guard marksman Mara Venn then inserts alone from the grassland beyond the perimeter.
 
 Two independent technical clocks begin at insertion: **05:00** until poison transfer and **02:30** until the valve vault is breached. Mara's primary route is to neutralize the poison operator or isolate the injection machine; once the poison is stopped, the city is safe even if the backup valve vault was breached. If poison is released, she must close the manual valve before the breach. Only if both protections fail does the south-backdoor city-main demolition become available. Every successful route ends with a counterattack and reinforcement hold, and killing all twenty hostiles is never required.
@@ -29,6 +42,17 @@ No package download, external server, or internet connection is needed after
 the repository and Node.js are present. Opening `index.html` directly is not
 supported because browsers block local model loading; use the included tiny
 local server.
+
+## Releases
+
+The [latest GitHub release](https://github.com/ZFrankJ/operation-clearwater/releases/latest)
+provides a stable, downloadable offline edition. GitHub also supplies ZIP and
+tar.gz source archives for every release. Extract the complete archive, then use
+the launcher for your operating system from [Run offline](#run-offline).
+
+GitHub Packages is intentionally not used: Operation Clearwater is a static web
+game, not a reusable software dependency or container image. Releases are the
+appropriate distribution channel for its offline edition.
 
 ## Controls
 
