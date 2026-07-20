@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /
+
+# Project source, releases, and documentation:
+# https://github.com/ZFrankJ/operation-clearwater

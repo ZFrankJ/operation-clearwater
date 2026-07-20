@@ -116,6 +116,7 @@ for (const asset of natureModels) {
 }
 
 const html = await readFile(join(root, 'index.html'), 'utf8');
+const robotsSource = await readFile(join(root, 'robots.txt'), 'utf8');
 const packageManifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 const readmeSource = await readFile(join(root, 'README.md'), 'utf8');
 const serverSource = await readFile(join(root, 'server.mjs'), 'utf8');
@@ -133,6 +134,14 @@ const requiredIds = [
 ];
 for (const id of requiredIds) assert(html.includes(`id="${id}"`), `DOM contract: #${id}`);
 assert(!/(?:src|href)=["']https?:\/\//.test(html), 'HTML has no runtime CDN dependency');
+assert(
+  /^User-agent:\s*\*\s*$[\s\S]*^Disallow:\s*\/\s*$[\s\S]*github\.com\/ZFrankJ\/operation-clearwater/m.test(robotsSource),
+  'robots.txt blocks crawler access and identifies the public GitHub source repository',
+);
+assert(
+  /['"]\.txt['"]:\s*['"]text\/plain; charset=utf-8['"]/.test(serverSource),
+  'the offline server serves robots.txt with the standard text/plain media type',
+);
 assert(html.includes('three.module.min.js'), 'local Three.js import map is present');
 assert(
   /<meta name=["']description["'] content=["']OPERATION CLEARWATER/.test(html) &&
@@ -1051,6 +1060,14 @@ assert(
     /extreme:[\s\S]*?playerHealth:\s*55[\s\S]*?enemyHealthMultiplier:\s*1\.8[\s\S]*?concealedVests:\s*true/.test(difficultySource) &&
     /if \(handled !== true\) this\.reset\(this\.checkpoint\)/.test(playerSource),
   'Normal is the default while harder settings progressively shift health, accuracy, and one-life rules',
+);
+assert(
+  /let difficulty\s*=\s*getDifficultyProfile\(params\.get\(['"]difficulty['"]\)\)\.id/.test(mainSource) &&
+    /if \(ui\.difficultySelect\) ui\.difficultySelect\.value = difficulty/.test(mainSource) &&
+    /function restartWithCurrentDifficulty\(\)[\s\S]*?new URL\(location\.href\)[\s\S]*?searchParams\.set\(['"]difficulty['"], difficulty\)[\s\S]*?location\.assign\(restartUrl\.href\)/.test(mainSource) &&
+    /ui\.onRestart\(restartWithCurrentDifficulty\)/.test(mainSource) &&
+    /ui\.onReplay\(restartWithCurrentDifficulty\)/.test(mainSource),
+  'Restart and Play Again preserve the active difficulty while a fresh URL still defaults to Normal',
 );
 const accuracyMultipliers = { easy: 1.2, normal: 0.92, hard: 0.62, extreme: 0.4 };
 const accuracyAt = (distance, multiplier, movementSpeed = 0) => {
