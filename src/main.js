@@ -77,8 +77,9 @@ let endingMode = false;
 let endingFailure = false;
 let endingElapsed = 0;
 let endingStats = null;
-let difficulty = 'normal';
+let difficulty = getDifficultyProfile(params.get('difficulty')).id;
 let difficultyProfile = getDifficultyProfile(difficulty);
+if (ui.difficultySelect) ui.difficultySelect.value = difficulty;
 let quality = 'high';
 let lastFrame = performance.now();
 let footsteps = 0;
@@ -1331,13 +1332,19 @@ function bindInput() {
     await player.lock();
     weapon.setEnabled(true);
   });
-  ui.onRestart(() => location.reload());
-  ui.onReplay(() => location.assign(location.pathname));
+  ui.onRestart(restartWithCurrentDifficulty);
+  ui.onReplay(restartWithCurrentDifficulty);
   ui.muteToggle?.addEventListener('change', () => audio.setMuted(ui.muteToggle.checked));
   ui.aimSelect?.addEventListener('change', () => {
     const aimMagnification = weapon?.setMagnification?.(ui.aimSelect.value) ?? Number(ui.aimSelect.value);
     if (gameStarted) ui.setHUD({ aimMagnification });
   });
+}
+
+function restartWithCurrentDifficulty() {
+  const restartUrl = new URL(location.href);
+  restartUrl.searchParams.set('difficulty', difficulty);
+  location.assign(restartUrl.href);
 }
 
 function showFatal(error) {
