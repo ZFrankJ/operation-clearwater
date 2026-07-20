@@ -1,0 +1,11 @@
+{
+  "name": "clearwater-fps",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OPERATION CLEARWATER — a self-contained 3D tactical story FPS",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node tests/check.mjs"
+  }
+}

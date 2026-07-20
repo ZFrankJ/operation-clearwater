@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#07131b" />
+  <meta name="description" content="OPERATION CLEARWATER — stop hostile operators from poisoning the city and disabling its emergency water shutoff." />
+  <link rel="icon" href="data:," />
+  <title>OPERATION CLEARWATER — Ridgewatch Waterworks</title>
+  <link rel="stylesheet" href="./src/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.min.js",
+      "three/addons/": "./vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game-canvas" aria-label="OPERATION CLEARWATER 3D game viewport"></canvas>
+
+  <div id="loading-screen" class="screen loading-screen">
+    <div class="loading-mark" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </div>
+    <p class="eyebrow">RIDGEWATCH WATERWORKS / ORIS</p>
+    <h1>OPERATION CLEARWATER</h1>
+    <p id="loading-status" class="loading-status">Establishing secure link…</p>
+    <div class="loading-track"><div id="loading-bar" class="loading-bar"></div></div>
+    <p class="loading-detail">Local assets · no network connection required</p>
+  </div>
+
+  <main id="start-screen" class="screen start-screen is-hidden" aria-labelledby="game-title">
+    <div class="keyart" aria-hidden="true"></div>
+    <div class="keyart-grade" aria-hidden="true"></div>
+    <section class="briefing-panel">
+      <div class="title-lockup">
+        <p class="eyebrow">A THREE-DIMENSIONAL TACTICAL STORY</p>
+        <h1 id="game-title" aria-label="OPERATION CLEARWATER">OPERATION<br /><span>CLEARWATER</span></h1>
+        <p class="subtitle">RIDGEWATCH WATERWORKS</p>
+      </div>
+
+      <div class="mission-brief">
+        <div class="brief-meta">
+          <span>01:46 LOCAL</span><span>RIDGEWATCH WATER SUPPLY</span><span>GLOBAL HAWK / COAST GUARD</span>
+        </div>
+        <p><strong>Terrorists in stolen guardian uniforms have seized the city waterworks.</strong> Eighteen gunmen protect two technical specialists: one is preparing a five-minute poison transfer, while the other is breaching the emergency valve vault in roughly two and a half minutes. If either specialist falls, another hostile can continue only by reaching the same controls. A Global Hawk pass will map all twenty occupants, the injection machine, the vault, and the backdoor supply pipe before insertion.</p>
+        <p class="role">Stop whoever is operating the poison controls or isolate the injection machine before transfer completes. If poison is released, close the municipal valve before its vault is breached. If both protections fail, demolish the marked backdoor main. Every successful route ends with a counterattack and reinforcement hold; eliminating all twenty is not required.</p>
+        <div class="brief-plans" aria-label="Indoor mission objectives">
+          <span><b>01</b> PROCESS HALL / STOP POISON TRANSFER</span>
+          <span><b>02</b> VALVE VAULT / PROTECT OR CLOSE MAIN</span>
+          <span><b>03</b> BACKDOOR PIPE / LAST-RESORT DEMOLITION</span>
+        </div>
+      </div>
+
+      <div class="deploy-row">
+        <button id="start-button" class="deploy-button" type="button">
+          <span class="button-topline">BEGIN OPERATION</span>
+          <span class="button-main">BEGIN RECON PASS</span>
+        </button>
+        <div class="option-stack">
+          <label>RENDER PROFILE
+            <select id="quality-select" aria-label="Render quality">
+              <option value="high">HIGH</option>
+              <option value="medium">BALANCED</option>
+              <option value="low">PERFORMANCE</option>
+            </select>
+          </label>
+          <label>AIM MAGNIFICATION
+            <select id="aim-select" aria-label="Aim magnification">
+              <option value="2" selected>2× CLOSE</option>
+              <option value="4">4× MEDIUM</option>
+              <option value="8">8× LONG</option>
+            </select>
+          </label>
+          <label>DIFFICULTY
+            <select id="difficulty-select" aria-label="Difficulty">
+              <option value="easy">EASY / FORGIVING</option>
+              <option value="normal" selected>NORMAL / STANDARD OPERATION</option>
+              <option value="hard">HARD / ONE LIFE</option>
+              <option value="extreme">EXTREME / CONCEALED VESTS</option>
+            </select>
+          </label>
+          <label class="toggle"><input id="mute-toggle" type="checkbox" /><span></span> MUTE AUDIO</label>
+        </div>
+      </div>
+
+      <div class="control-grid" aria-label="Game controls">
+        <div><kbd>W A S D</kbd><span>MOVE</span></div>
+        <div><kbd>MOUSE</kbd><span>AIM</span></div>
+        <div><kbd>LMB</kbd><span>FIRE</span></div>
+        <div><kbd>RMB / X</kbd><span>HOLD TO AIM</span></div>
+        <div><kbd>2 / 4 / 8</kbd><span>CHANGE AIM</span></div>
+        <div><kbd>R</kbd><span>RELOAD</span></div>
+        <div><kbd>E</kbd><span>INTERACT</span></div>
+        <div><kbd>SHIFT</kbd><span>SPRINT / LOWER</span></div>
+        <div><kbd>SPACE</kbd><span>VAULT / JUMP</span></div>
+      </div>
+      <p class="start-note">Global Hawk thermal sweep precedes insertion · Click to recapture mouse · Esc pauses</p>
+    </section>
+    <aside class="operation-strip" aria-hidden="true">
+      <span>OPERATION CLEARWATER</span><i></i><span>THERMAL PASS: READY</span><i></i><span>STATUS: GO</span>
+    </aside>
+  </main>
+
+  <section id="hud" class="hud is-hidden" aria-label="Heads-up display">
+    <header class="hud-top">
+      <div class="location-card">
+        <p>OPERATION CLEARWATER</p>
+        <strong id="location-label">RURAL ACCESS TRAIL</strong>
+      </div>
+      <div id="compass" class="compass"><span>W</span><b>330</b><strong>N</strong><b>030</b><span>E</span></div>
+      <div class="threat-card"><span class="status-dot"></span><div><small>TACTICAL LINK</small><strong id="link-state">DEGRADED</strong></div></div>
+    </header>
+
+    <div class="objective-card">
+      <p id="objective-kicker">PRIMARY / 01</p>
+      <strong id="objective-text">INFILTRATE FROM OUTSIDE THE PERIMETER</strong>
+      <span id="objective-distance">— M</span>
+      <div class="objective-rule"></div>
+    </div>
+
+    <div id="defense-timer" class="defense-timer is-hidden">
+      <small>RESPONSE FORCE</small><strong>01:00</strong><span>HOLD SECURED OBJECTIVE</span>
+    </div>
+
+    <div id="threat-timers" class="threat-timers is-hidden" aria-label="Technical threat timers">
+      <div id="poison-clock" class="threat-clock threat-clock-poison">
+        <small>POISON TRANSFER</small><strong id="poison-clock-value">05:00</strong><span id="poison-clock-status">TECH ACTIVE</span>
+      </div>
+      <div id="vault-clock" class="threat-clock threat-clock-vault">
+        <small>VALVE VAULT BREACH</small><strong id="vault-clock-value">02:30</strong><span id="vault-clock-status">TECH ACTIVE</span>
+      </div>
+    </div>
+
+    <div id="crosshair" class="crosshair" aria-hidden="true">
+      <i class="crosshair-top"></i><i class="crosshair-right"></i><i class="crosshair-bottom"></i><i class="crosshair-left"></i><b></b>
+    </div>
+    <div id="hitmarker" class="hitmarker" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+    <div id="interact" class="interact-prompt is-hidden">
+      <div class="interact-key">E</div>
+      <div><small>HOLD TO INTERACT</small><strong id="interact-label">OPERATE CONTROL</strong><div class="interact-track"><span id="interact-progress"></span></div></div>
+    </div>
+
+    <div class="vitals-card">
+      <div class="vital-heading"><span>MARA VENN</span><small>COAST GUARD / MARKSMAN</small></div>
+      <div class="health-row"><span>VITAL</span><div class="health-track"><i id="health-fill"></i></div><strong id="health-value">100</strong></div>
+      <div class="armor-row"><span>PLATE</span><b id="armor-pips"><i></i><i></i><i></i><i></i></b><strong id="armor-value">50</strong></div>
+    </div>
+
+    <div class="ammo-card">
+      <div class="weapon-name"><span>VCS-4</span><small>SERVICE CARBINE</small></div>
+      <div class="ammo-readout"><strong id="ammo-current">30</strong><span>/</span><b id="ammo-reserve">120</b></div>
+      <div class="fire-mode"><i></i><span>AUTO</span><span>5.56</span><span id="aim-mode">2× AIM</span></div>
+    </div>
+
+    <div id="subtitle" class="radio-subtitle is-hidden" role="status" aria-live="polite">
+      <div class="radio-avatar"><span></span></div>
+      <div><small id="subtitle-speaker">LEILA SERRA / RADIO</small><p id="subtitle-text"></p></div>
+    </div>
+
+    <div id="toast-layer" class="toast-layer" aria-live="polite"></div>
+    <div id="damage-vignette" class="damage-vignette" aria-hidden="true"></div>
+    <div id="death-veil" class="death-veil is-hidden" aria-hidden="true"><i></i><b></b></div>
+  </section>
+
+  <section id="thermal-overlay" class="thermal-overlay is-hidden" aria-label="Global Hawk thermal reconnaissance">
+    <div class="thermal-scanlines" aria-hidden="true"></div>
+    <div class="thermal-reticle" aria-hidden="true"><i></i><i></i><b></b></div>
+    <header>
+      <div><small>RQ-4 GLOBAL HAWK / EO-IR</small><strong id="thermal-drone-label">RIDGEWATCH PASS 01</strong></div>
+      <div class="thermal-record"><i></i><span id="thermal-scan-status">SCANNING</span></div>
+    </header>
+    <div class="thermal-count-card">
+      <small id="thermal-count-label">HEAT SIGNATURES</small>
+      <strong id="thermal-count">--</strong>
+      <span id="thermal-sector">OUTER PERIMETER</span>
+    </div>
+    <div class="thermal-footer">
+      <span>ALT 16,700 M</span><span>IR WHITE HOT</span><span>LINK ENCRYPTED</span>
+      <div class="thermal-track"><i id="thermal-progress"></i></div>
+    </div>
+  </section>
+
+  <section id="pause-screen" class="screen pause-screen is-hidden">
+    <div class="pause-panel">
+      <p class="eyebrow">TACTICAL LINK SUSPENDED</p>
+      <h2>PAUSED</h2>
+      <p>Threat and reinforcement clocks are holding at the last secure checkpoint.</p>
+      <button id="resume-button" type="button">RESUME OPERATION</button>
+      <button id="restart-button" class="secondary-button" type="button">RESTART FROM ACCESS TRAIL</button>
+      <div class="pause-controls"><span>WASD MOVE</span><span>LMB FIRE</span><span>RMB / X HOLD AIM</span><span>2 / 4 / 8 CHANGE AIM</span><span>R RELOAD</span><span>E INTERACT</span></div>
+    </div>
+  </section>
+
+  <section id="ending-screen" class="screen ending-screen is-hidden" aria-labelledby="ending-title">
+    <div class="ending-image" aria-hidden="true"></div>
+    <div class="ending-grade" aria-hidden="true"></div>
+    <div class="ending-card">
+      <p id="ending-eyebrow" class="eyebrow">PRIMARY PLAN COMPLETE / WATER SAFE</p>
+      <h2 id="ending-title">THE POISON<br />NEVER <span>FLOWED.</span></h2>
+      <div id="ending-stats" class="ending-stats"></div>
+      <div class="ending-outcome">
+        <div><small id="ending-water-label">WATER STATUS</small><strong id="ending-water-value">SAFE</strong></div>
+        <div><small id="ending-supply-label">SUPPLY MAIN</small><strong id="ending-supply-value">FLOWING</strong></div>
+        <div><small id="ending-residents-label">RESIDENTS PROTECTED</small><strong id="ending-residents-value">218,000</strong></div>
+      </div>
+      <button id="replay-button" type="button">PLAY AGAIN</button>
+      <p class="credits-line">Designed and built for this challenge · Local, self-contained, and playable offline</p>
+    </div>
+  </section>
+
+  <noscript>OPERATION CLEARWATER requires JavaScript and WebGL.</noscript>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+vendor/** linguist-vendored
+
+*.bin binary
+*.fbx binary
+*.glb binary
+*.hdr binary
+*.jpg binary
+*.jpeg binary
+*.mp3 binary
+*.png binary
+*.wasm binary

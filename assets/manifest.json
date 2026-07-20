@@ -1,0 +1,318 @@
+{
+  "project": "CLEARWATER",
+  "runtime": { "three": "0.185.1", "local": true },
+  "assets": [
+    {
+      "path": "assets/images/clearwater-keyart.png",
+      "role": "archived original title and ending key art",
+      "source": "OpenAI image generation built-in tool",
+      "license": "project-original"
+    },
+    {
+      "path": "assets/images/clearwater-ridge-keyart.png",
+      "role": "archived Ridgewatch title and ending key art",
+      "source": "OpenAI image generation built-in tool",
+      "license": "project-original"
+    },
+    {
+      "path": "assets/images/clearwater-waterworks-keyart.png",
+      "role": "current Operation Clearwater title and outcome key art",
+      "source": "OpenAI image generation built-in tool",
+      "license": "project-original"
+    },
+    {
+      "path": "assets/models/characters/security-male.fbx",
+      "role": "realistic skinned security character",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/security-idle.fbx",
+      "role": "humanoid idle animation",
+      "source": "Microsoft Rocketbox",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/security-walk.fbx",
+      "role": "humanoid walk animation",
+      "source": "Microsoft Rocketbox",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/security-run.fbx",
+      "role": "humanoid run animation",
+      "source": "Microsoft Rocketbox",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_body_color.jpg",
+      "role": "security character body base color",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_body_normal.jpg",
+      "role": "security character body normal map",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_body_specular.jpg",
+      "role": "security character body specular map",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_head_color.jpg",
+      "role": "security character head base color",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_head_normal.jpg",
+      "role": "security character head normal map",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_head_specular.jpg",
+      "role": "security character head specular map",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_equipment_color.jpg",
+      "role": "security equipment base color",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_equipment_normal.jpg",
+      "role": "security equipment normal map",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/characters/m171_equipment_specular.jpg",
+      "role": "security equipment specular map",
+      "source": "Microsoft Rocketbox / Security_Male_01",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/hands/military-male-04-arms.fbx",
+      "role": "byte-identical upstream Military_Male_04.fbx full skinned avatar; runtime extracts its authored forearms, gloved hands, skeleton, and finger rig for the first-person viewmodel",
+      "source": "https://github.com/microsoft/Microsoft-Rocketbox/blob/master/Assets/Avatars/Professions/Military_Male_04/Export/Military_Male_04.fbx",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/hands/sm005_body_color_acu.jpg",
+      "role": "first-person arm ACU fabric, glove, and skin base color; 1K JPEG conversion of upstream sm005_body_color_acu.tga",
+      "source": "https://github.com/microsoft/Microsoft-Rocketbox/blob/master/Assets/Avatars/Professions/Military_Male_04/Textures/sm005_body_color_acu.tga",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/hands/sm005_body_normal.png",
+      "role": "first-person arm fabric, glove, and skin normal map; lossless 1K PNG conversion of upstream sm005_body_normal.tga",
+      "source": "https://github.com/microsoft/Microsoft-Rocketbox/blob/master/Assets/Avatars/Professions/Military_Male_04/Textures/sm005_body_normal.tga",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/hands/sm005_body_specular.jpg",
+      "role": "first-person arm fabric, glove, and skin specular map; 1K JPEG conversion of upstream sm005_body_specular.tga",
+      "source": "https://github.com/microsoft/Microsoft-Rocketbox/blob/master/Assets/Avatars/Professions/Military_Male_04/Textures/sm005_body_specular.tga",
+      "license": "MIT"
+    },
+    {
+      "path": "assets/models/weapons/m4a1.fbx",
+      "role": "archived low-detail service carbine fallback model",
+      "source": "nisu / 3DModelsCC0 via OpenGameArt",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/weapons/M4A1Diffuse.png",
+      "role": "archived low-detail service carbine diffuse texture",
+      "source": "nisu / 3DModelsCC0 via OpenGameArt",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/weapons/m4a1-pbr.fbx",
+      "role": "active full-detail PBR service carbine model",
+      "source": "https://opengameart.org/content/m4a1-assault-rifle",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/weapons/M4A1_Base_Color.png",
+      "role": "active service carbine PBR base color",
+      "source": "https://opengameart.org/content/m4a1-assault-rifle",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/weapons/M4A1_Height.png",
+      "role": "active service carbine PBR height map",
+      "source": "https://opengameart.org/content/m4a1-assault-rifle",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/weapons/M4A1_Metallic.png",
+      "role": "active service carbine PBR metallic map",
+      "source": "https://opengameart.org/content/m4a1-assault-rifle",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/weapons/M4A1_Normal.png",
+      "role": "active service carbine PBR OpenGL normal map",
+      "source": "https://opengameart.org/content/m4a1-assault-rifle",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/weapons/M4A1_Roughness.png",
+      "role": "active service carbine PBR roughness map",
+      "source": "https://opengameart.org/content/m4a1-assault-rifle",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/models/pine_sapling_small/pine_sapling_small_1k.gltf",
+      "role": "high-fidelity authored pine trees",
+      "source": "https://polyhaven.com/a/pine_sapling_small",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/models/shrub_02/shrub_02_1k.gltf",
+      "role": "authored narrow coastal shrubs",
+      "source": "https://polyhaven.com/a/shrub_02",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/models/shrub_04/shrub_04_1k.gltf",
+      "role": "authored broad coastal shrubs",
+      "source": "https://polyhaven.com/a/shrub_04",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/models/grass_medium_02/grass_medium_02_1k.gltf",
+      "role": "modeled dry meadow grass clusters",
+      "source": "https://polyhaven.com/a/grass_medium_02",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/models/boulder_01/boulder_01_1k.gltf",
+      "role": "grounded boulder cover",
+      "source": "https://polyhaven.com/a/boulder_01",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/models/rock_07/rock_07_1k.gltf",
+      "role": "authored weathered ground rocks",
+      "source": "https://polyhaven.com/a/rock_07",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/withered_grass/withered_grass_diff_1k.jpg",
+      "role": "meadow PBR base color",
+      "source": "https://polyhaven.com/a/withered_grass",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/withered_grass/withered_grass_nor_gl_1k.jpg",
+      "role": "meadow PBR normal",
+      "source": "https://polyhaven.com/a/withered_grass",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/withered_grass/withered_grass_rough_1k.jpg",
+      "role": "meadow PBR roughness",
+      "source": "https://polyhaven.com/a/withered_grass",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/withered_grass/withered_grass_ao_1k.jpg",
+      "role": "meadow PBR ambient occlusion",
+      "source": "https://polyhaven.com/a/withered_grass",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/mud_forest/mud_forest_diff_1k.jpg",
+      "role": "active wet reservoir-meadow PBR base color",
+      "source": "https://polyhaven.com/a/mud_forest",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/mud_forest/mud_forest_nor_gl_1k.jpg",
+      "role": "active wet reservoir-meadow PBR normal",
+      "source": "https://polyhaven.com/a/mud_forest",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/mud_forest/mud_forest_rough_1k.jpg",
+      "role": "active wet reservoir-meadow PBR roughness",
+      "source": "https://polyhaven.com/a/mud_forest",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/mud_forest/mud_forest_ao_1k.jpg",
+      "role": "active wet reservoir-meadow PBR ambient occlusion",
+      "source": "https://polyhaven.com/a/mud_forest",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/dry_ground_rocks/dry_ground_rocks_diff_1k.jpg",
+      "role": "gravel trail PBR base color",
+      "source": "https://polyhaven.com/a/dry_ground_rocks",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/dry_ground_rocks/dry_ground_rocks_nor_gl_1k.jpg",
+      "role": "gravel trail PBR normal",
+      "source": "https://polyhaven.com/a/dry_ground_rocks",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/dry_ground_rocks/dry_ground_rocks_rough_1k.jpg",
+      "role": "gravel trail PBR roughness",
+      "source": "https://polyhaven.com/a/dry_ground_rocks",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/nature/surfaces/dry_ground_rocks/dry_ground_rocks_ao_1k.jpg",
+      "role": "gravel trail PBR ambient occlusion",
+      "source": "https://polyhaven.com/a/dry_ground_rocks",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/models/vehicles/global-hawk.glb",
+      "role": "opening Global Hawk reconnaissance flyover and thermal-scan presentation",
+      "source": "NASA 3D Resources: https://assets.science.nasa.gov/content/dam/science/cds/3d/resources/model/global-hawk/Global%20Hawk.glb; copied from user-owned local asset",
+      "license": "NASA media guidelines"
+    },
+    {
+      "path": "assets/audio/jet-plane-flyby.mp3",
+      "role": "real recorded opening aircraft engine and Doppler flyby layer",
+      "source": "Jet Plane Flyby by qubodup: https://freesound.org/people/qubodup/sounds/189446/; extracted from U.S. Government footage",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/textures/docklands_02_1k.hdr",
+      "role": "natural outdoor image-based lighting",
+      "source": "Poly Haven / Docklands 02",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/textures/concrete-diff.jpg",
+      "role": "PBR concrete base color",
+      "source": "Poly Haven / concrete_pavement_02",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/textures/concrete-normal.jpg",
+      "role": "PBR concrete normal",
+      "source": "Poly Haven / concrete_pavement_02",
+      "license": "CC0-1.0"
+    },
+    {
+      "path": "assets/textures/concrete-rough.jpg",
+      "role": "PBR concrete roughness",
+      "source": "Poly Haven / concrete_pavement_02",
+      "license": "CC0-1.0"
+    }
+  ]
+}
