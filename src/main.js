@@ -753,8 +753,8 @@ function updateHUD(playerState, weaponState, missionState) {
     : null;
   const index = Math.max(0, missionState?.stageIndex ?? 0) + 1;
   ui.setHUD({
-    health: playerState?.health ?? 100,
-    maxHealth: playerState?.maxHealth ?? 100,
+    health: playerState?.health ?? 120,
+    maxHealth: playerState?.maxHealth ?? 120,
     armor: playerState?.armor ?? 0,
     ammo: weaponState?.ammo ?? 0,
     reserve: weaponState?.reserve ?? 0,
@@ -1605,6 +1605,7 @@ function frame(now) {
       health: qaPlayerState.health,
       maxHealth: qaPlayerState.maxHealth,
       armor: qaPlayerState.armor,
+      maxArmor: qaPlayerState.maxArmor,
       difficulty: qaPlayerState.difficulty,
       alive: qaPlayerState.alive,
       mobility: qaPlayerState.mobility,

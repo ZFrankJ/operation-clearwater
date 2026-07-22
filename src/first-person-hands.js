@@ -11,11 +11,12 @@ const ARM_WEIGHT_THRESHOLD = 0.25;
 // camera plane, like a real shouldered rifle, so only forearms/hands enter the
 // view instead of a sleeve starting centimetres in front of the player's eye.
 const MODEL_SCALE = 0.01;
-const MODEL_POSITION = new THREE.Vector3(0.18, -1.65, -0.12);
+const MODEL_POSITION = new THREE.Vector3(0.18, -1.65, -0.183);
 // ADS centres the rifle about 25 cm left of its hip pose. Shift only the
 // hidden shoulder armature left with it so the firing arm remains within its
 // real 55 cm two-bone reach instead of stretching 4+ cm short of the grip.
-const ADS_ARMATURE_X = 0.07;
+const ADS_ARMATURE_X = 0.04;
+const ADS_ARMATURE_Z = -0.223;
 const SPRINT_ARMATURE_X = 0.25;
 const SPRINT_ARMATURE_Y = -1.7;
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -26,42 +27,52 @@ const UP = new THREE.Vector3(0, 1, 0);
 // These are reachable wrist seats in the normalized rifle's local space, not
 // the centres of the parts being held. The firing wrist sits above/behind the
 // pistol grip; the support wrist seats against the handguard's left flank.
-// Keep the firing hand in the shoulder-side/rear seat of the rifle.  The old
-// -0.145 Z position left only six centimetres between the two wrists, which
-// visually merged the rear hand with the support hand.  Moving it toward the
-// body restores a practical rear-versus-front grip separation; the analytic
-// elbow solve below drops the rear elbow while preserving this wrist seat.
-const TRIGGER_GRIP = new THREE.Vector3(0.06, -0.03, -0.061);
-const SUPPORT_GRIP = new THREE.Vector3(-0.048, -0.015, -0.205);
+// Keep the firing hand in the shoulder-side/rear seat of the rifle. The lower
+// wrist position compensates for the upright palm-plane turn, keeping the
+// knuckles and trigger finger on the grip instead of opening away from it. The
+// analytic elbow solve below still drops the rear elbow into a natural bend.
+const TRIGGER_GRIP = new THREE.Vector3(0.024, -0.029, -0.015);
+// Seat the support wrist beneath the forward handguard. Its upward-facing palm
+// rises into the rail while the glove crosses it on a slight forward diagonal,
+// instead of producing a vertical stack of fingers on the handguard's side.
+const SUPPORT_GRIP = new THREE.Vector3(-0.058, 0.008, -0.288);
 // Measured from the normalized CC0 M4's Trigger mesh (centre y=.0041,
 // z=-.1363). Both index joints converge on this point, placing the modeled
 // distal glove pad on the trigger without a generic curl pulling it away.
-const TRIGGER_CONTACT = new THREE.Vector3(0.006, 0.004, -0.138);
-const TRIGGER_FINGER_GUIDE = new THREE.Vector3(0.006, 0.004, -0.138);
+const TRIGGER_CONTACT = new THREE.Vector3(-0.001, 0.004, -0.137);
+// Bend the index leftward in two visible stages instead of aiming both bones
+// at one point. The distal bone then aims directly at the real trigger centre,
+// so the glove pad closes onto it instead of stretching sideways past it.
+const TRIGGER_FINGER_GUIDE = new THREE.Vector3(-0.012, 0.005, -0.116);
+const TRIGGER_FINGER_PAD = new THREE.Vector3(-0.001, 0.004, -0.137);
 // Rocketbox's hand local X runs wrist-to-knuckles, local Y is the palm normal,
 // and local Z crosses thumb-to-pinky. The firing knuckles descend almost
-// vertically into the pistol grip; the support knuckles travel mostly forward
-// (-Z) from the rail-side wrist seat. Keeping local Y horizontal makes the X/Z
-// palm plane vertical instead of laying either hand flat across the rifle.
-// Fallback axis used before the live arm chain is available. During the pose
-// solve, the rear hand bone follows the elbow-to-wrist direction exactly.
-const FIRING_HAND_AXIS = new THREE.Vector3(-0.657, 0.277, -0.701);
-// Keep the rear forearm level, but rake the hand itself by only seven degrees
-// around its palm normal. This changes the rigid `|` grip silhouette into the
-// requested slight `\` without moving the wrist off the pistol grip.
-const FIRING_HAND_TILT = THREE.MathUtils.degToRad(7);
-// With the hand's local X axis following the live forearm, the palm normal
-// must remain perpendicular to that line. Point local Y along the weapon so
-// the glove can roll around the straight wrist and close down onto the grip.
-const FIRING_PALM_NORMAL = new THREE.Vector3(0, 0, 1);
-const SUPPORT_HAND_AXIS = new THREE.Vector3(0, 0.25, -0.968);
-const SUPPORT_PALM_NORMAL = new THREE.Vector3(1, 0, 0);
-// The support thumb is not another curled finger. These two points steer the
-// real three-bone thumb diagonally over the near rail and onto the far face of
-// the handguard, visibly opposing the four fingers wrapped underneath it.
-const SUPPORT_THUMB_BRIDGE = new THREE.Vector3(-0.03, 0.037, -0.244);
-const SUPPORT_THUMB_CONTACT = new THREE.Vector3(-0.02, 0.032, -0.272);
-const SUPPORT_THUMB_PAD = new THREE.Vector3(-0.022, 0.03, -0.292);
+// vertically into the pistol grip; the support knuckles travel mostly across
+// the rail (+X) with a small forward component (-Z). Keeping its local Y aimed
+// upward lays the support palm beneath the handguard.
+// The firing hand's wrist-to-knuckle line follows the rifle when viewed from
+// above, producing `|` rather than `\`. Its palm faces inward from the right;
+// the support palm faces upward beneath the rail, so the two hands occupy
+// distinct, anatomically plausible grip planes.
+const FIRING_HAND_AXIS = new THREE.Vector3(0, 0, -1);
+const FIRING_HAND_TILT = 0;
+const FIRING_PALM_NORMAL = new THREE.Vector3(-1, 0, 0);
+const SUPPORT_HAND_AXIS = new THREE.Vector3(0.985, 0, -0.174);
+const SUPPORT_PALM_NORMAL = new THREE.Vector3(0, 1, 0);
+// The firing thumb needs a visible hook around the rear/top contour of the
+// pistol grip. Its first two joints stay behind the grip's rear edge while
+// crossing toward the far side, then the pad closes forward onto that face.
+// From overhead this produces a `]` wrap instead of a hidden `-|` silhouette.
+const FIRING_THUMB_BRIDGE = new THREE.Vector3(0.018, 0.022, -0.058);
+const FIRING_THUMB_CONTACT = new THREE.Vector3(-0.014, 0.02, -0.062);
+const FIRING_THUMB_PAD = new THREE.Vector3(-0.024, 0.012, -0.102);
+const PISTOL_GRIP_REAR_Z = -0.08;
+// The support thumb is not another curled finger. These three points steer the
+// real thumb inward and forward, then turn its pad downward around the lower
+// handguard edge, visibly opposing the four fingers wrapped underneath it.
+const SUPPORT_THUMB_BRIDGE = new THREE.Vector3(-0.04, 0.03, -0.32);
+const SUPPORT_THUMB_CONTACT = new THREE.Vector3(-0.01, 0.025, -0.33);
+const SUPPORT_THUMB_PAD = new THREE.Vector3(0.02, 0.015, -0.34);
 const MAGAZINE_HAND_AXIS = new THREE.Vector3(0.08, -0.96, -0.26);
 const MAGAZINE_FALLBACK = new THREE.Vector3(-0.018, -0.145, -0.205);
 const MAGAZINE_POUCH = new THREE.Vector3(-0.04, -0.22, -0.235);
@@ -72,18 +83,17 @@ const MAX_RELOAD_SUPPORT_RISE = 0.025;
 // Added local-Z flex, in radians, for [knuckle, middle, tip]. Rocketbox's
 // bind pose already contains a small positive anatomical bend. The previous
 // negative offsets cancelled that bend and made the gloves look straight.
-// Finger 1 is the index finger: the firing index receives a strong knuckle
-// turn toward the trigger but only a small distal hook. The other firing
-// fingers keep a restrained, index-like bend rather than folding sharply
-// sideways across the pistol grip. The support hand still closes progressively
-// around the handguard.
+// Finger 1 is the index finger and receives an explicit three-bone trigger
+// contact below. The other firing fingers close into one compact circular grip
+// around the pistol handle rather than resting in a partially open pose. The
+// support hand closes progressively around the forward handguard.
 const FINGER_CURL_POSES = Object.freeze({
   right: Object.freeze({
     0: Object.freeze([0.2, 0.48, 0.54]),
-    1: Object.freeze([0.64, 0.1, 0.16]),
-    2: Object.freeze([0.7, 0.5, 0.45]),
-    3: Object.freeze([0.7, 0.5, 0.45]),
-    4: Object.freeze([0.7, 0.5, 0.45]),
+    1: Object.freeze([0.64, 0.48, 0.42]),
+    2: Object.freeze([0.94, 1.08, 1.02]),
+    3: Object.freeze([0.94, 1.08, 1.02]),
+    4: Object.freeze([0.94, 1.08, 1.02]),
   }),
   left: Object.freeze({
     0: Object.freeze([0.24, 0.55, 0.6]),
@@ -267,7 +277,7 @@ export class FirstPersonHands {
     this.root.userData.noHit = true;
     this.root.userData.sourceAsset = 'Microsoft Rocketbox Military_Male_04';
     this.root.userData.poseContract = {
-      version: 7,
+      version: 11,
       coordinateSpace: 'weapon-local metres',
       rocketboxPalmPlane: 'local X/Z',
       rocketboxPalmNormal: 'local +Y',
@@ -275,23 +285,31 @@ export class FirstPersonHands {
       supportWrist: SUPPORT_GRIP.toArray(),
       triggerContact: TRIGGER_CONTACT.toArray(),
       triggerFingerGuide: TRIGGER_FINGER_GUIDE.toArray(),
+      triggerFingerPad: TRIGGER_FINGER_PAD.toArray(),
       firingHandAxis: FIRING_HAND_AXIS.toArray(),
       firingPalmNormal: FIRING_PALM_NORMAL.toArray(),
-      rearHandBoneAlignment: 'slight_diagonal',
+      rearHandBoneAlignment: 'weapon_parallel_from_above',
       rearHandDownturnDegrees: 0,
       rearHandTiltDegrees: THREE.MathUtils.radToDeg(FIRING_HAND_TILT),
       rearElbowPose: 'lowered_camera_local',
+      firingThumbBridge: FIRING_THUMB_BRIDGE.toArray(),
+      firingThumbContact: FIRING_THUMB_CONTACT.toArray(),
+      firingThumbPad: FIRING_THUMB_PAD.toArray(),
       supportHandAxis: SUPPORT_HAND_AXIS.toArray(),
       supportPalmNormal: SUPPORT_PALM_NORMAL.toArray(),
       supportThumbBridge: SUPPORT_THUMB_BRIDGE.toArray(),
       supportThumbContact: SUPPORT_THUMB_CONTACT.toArray(),
       supportThumbPad: SUPPORT_THUMB_PAD.toArray(),
+      supportGripMode: 'horizontal_cross_barrel_handguard',
       magazinePouch: MAGAZINE_POUCH.toArray(),
       adsArmatureX: ADS_ARMATURE_X,
+      adsArmatureZ: ADS_ARMATURE_Z,
       sprintArmatureX: SPRINT_ARMATURE_X,
       sprintArmatureY: SPRINT_ARMATURE_Y,
       sprintRearGrip: 'same_as_hip_weapon_local',
-      triggerIndexSolve: 'excluded from generic curl; final absolute two-bone aim',
+      sprintElbowBranch: 'continuous_nearest_previous_pole',
+      triggerIndexSolve: 'excluded from generic curl; final absolute three-bone leftward hook',
+      firingThumbSolve: 'excluded from generic curl; final absolute three-bone surface wrap',
       supportThumbSolve: 'excluded from generic curl; final absolute opposed three-bone aim',
       supportThumbOpposition: 'dot(thumb base-to-pad, middle tip-to-knuckle); negative is opposed',
       compactReloadTravelLimit: COMPACT_RELOAD_TRAVEL_LIMIT,
@@ -315,6 +333,10 @@ export class FirstPersonHands {
     this._triggerWorld = new THREE.Vector3();
     this._triggerContactWorld = new THREE.Vector3();
     this._triggerFingerGuideWorld = new THREE.Vector3();
+    this._triggerFingerPadWorld = new THREE.Vector3();
+    this._firingThumbBridgeWorld = new THREE.Vector3();
+    this._firingThumbContactWorld = new THREE.Vector3();
+    this._firingThumbPadWorld = new THREE.Vector3();
     this._supportWorld = new THREE.Vector3();
     this._supportThumbBridgeWorld = new THREE.Vector3();
     this._supportThumbContactWorld = new THREE.Vector3();
@@ -327,6 +349,9 @@ export class FirstPersonHands {
     this._rightPalmWorld = new THREE.Vector3();
     this._leftPalmWorld = new THREE.Vector3();
     this._elbowDirection = new THREE.Vector3();
+    this._elbowAlternate = new THREE.Vector3();
+    this._rightElbowPoleWorld = new THREE.Vector3();
+    this._rightElbowPoleValid = false;
     this._towardTarget = new THREE.Vector3();
     this._shoulder = new THREE.Vector3();
     this._elbow = new THREE.Vector3();
@@ -474,6 +499,7 @@ export class FirstPersonHands {
 
   setEnabled(enabled) {
     this.enabled = Boolean(enabled);
+    if (!this.enabled) this._rightElbowPoleValid = false;
     this.root.visible = this.enabled && this.loaded;
   }
 
@@ -488,6 +514,10 @@ export class FirstPersonHands {
     }
     if ('enabled' in state) this.setEnabled(state.enabled);
     if (!this.enabled) return this;
+    // A zero-delta update is an authored teleport/reset used by respawn and
+    // deterministic pose inspection. Start a fresh elbow branch there; normal
+    // gameplay frames retain the prior pole for continuous sprint blending.
+    if (dt <= 0) this._rightElbowPoleValid = false;
 
     const ads = clamp01(state.ads);
     const sprint = clamp01(state.sprint ?? state.sprintBlend);
@@ -507,6 +537,10 @@ export class FirstPersonHands {
     this.model.position.y = dt > 0
       ? dampAndSnap(this.model.position.y, armatureY, 24, dt)
       : armatureY;
+    const armatureZ = THREE.MathUtils.lerp(MODEL_POSITION.z, ADS_ARMATURE_Z, ads);
+    this.model.position.z = dt > 0
+      ? dampAndSnap(this.model.position.z, armatureZ, 24, dt)
+      : armatureZ;
 
     this.camera.updateMatrixWorld(true);
     this.weaponRoot?.updateWorldMatrix(true, true);
@@ -515,6 +549,10 @@ export class FirstPersonHands {
     this._weaponPoint(TRIGGER_GRIP, this._triggerWorld);
     this._weaponPoint(TRIGGER_CONTACT, this._triggerContactWorld);
     this._weaponPoint(TRIGGER_FINGER_GUIDE, this._triggerFingerGuideWorld);
+    this._weaponPoint(TRIGGER_FINGER_PAD, this._triggerFingerPadWorld);
+    this._weaponPoint(FIRING_THUMB_BRIDGE, this._firingThumbBridgeWorld);
+    this._weaponPoint(FIRING_THUMB_CONTACT, this._firingThumbContactWorld);
+    this._weaponPoint(FIRING_THUMB_PAD, this._firingThumbPadWorld);
     this._weaponPoint(SUPPORT_GRIP, this._supportWorld);
     this._weaponPoint(SUPPORT_THUMB_BRIDGE, this._supportThumbBridgeWorld);
     this._weaponPoint(SUPPORT_THUMB_CONTACT, this._supportThumbContactWorld);
@@ -609,7 +647,7 @@ export class FirstPersonHands {
     this._orientHand(this.rig.left.hand, this._leftAxisWorld, this._leftPalmWorld, response);
 
     const relaxed = reloading ? Math.sin(Math.PI * phase(reloadProgress, 0.36, 0.76)) : 0;
-    this._poseFingers('right', 1, response);
+    this._poseFingers('right', 1, response, true);
     this._poseFingers(
       'left',
       THREE.MathUtils.lerp(1, 0.44, relaxed),
@@ -617,12 +655,24 @@ export class FirstPersonHands {
       leftMode === 'support',
     );
     // Solve the real Rocketbox index chain onto the authored M4 trigger after
-    // applying the grip curl. The middle segment crosses within millimetres of
-    // TRIGGER_CONTACT; the other three fingers retain their wrapped pose.
-    this._aimBoneXAxis(this.rig.right.indexBase, this._triggerContactWorld, 1);
+    // applying the grip curl. Its knuckle first travels inward/left, its middle
+    // reaches the trigger, and its distal pad closes across the trigger face.
+    this._aimBoneXAxis(this.rig.right.indexBase, this._triggerFingerGuideWorld, 1);
     this.rig.right.indexBase.updateWorldMatrix(true, true);
-    this._aimBoneXAxis(this.rig.right.indexMiddle, this._triggerFingerGuideWorld, 1);
+    this._aimBoneXAxis(this.rig.right.indexMiddle, this._triggerContactWorld, 1);
     this.rig.right.indexMiddle.updateWorldMatrix(true, true);
+    this._aimBoneXAxis(this.rig.right.indexDistal, this._triggerFingerPadWorld, 1);
+    this.rig.right.indexDistal.updateWorldMatrix(true, true);
+
+    // Route the real three-bone firing thumb around the outside of the pistol
+    // grip after the hand and other fingers are posed. Keeping it out of the
+    // generic curl prevents the pad from rotating back through the handle.
+    this._aimBoneXAxis(this.rig.right.thumbBase, this._firingThumbBridgeWorld, 1);
+    this.rig.right.thumbBase.updateWorldMatrix(true, true);
+    this._aimBoneXAxis(this.rig.right.thumbMiddle, this._firingThumbContactWorld, 1);
+    this.rig.right.thumbMiddle.updateWorldMatrix(true, true);
+    this._aimBoneXAxis(this.rig.right.thumbDistal, this._firingThumbPadWorld, 1);
+    this.rig.right.thumbDistal.updateWorldMatrix(true, true);
 
     // On the foregrip the thumb closes from the opposite side of the four
     // fingers. Three absolute bone aims keep the modeled pad on the far rail
@@ -672,14 +722,19 @@ export class FirstPersonHands {
     const firingUpperArmAxis = firingElbow.clone().sub(firingShoulder).normalize();
     const firingPalmNormal = localDirection(this.rig.right.hand, new THREE.Vector3(0, 1, 0));
     const firingHandAxis = localDirection(this.rig.right.hand, X_AXIS);
+    const firingSilhouetteAxis = localDirection(this.rig.right.hand, Z_AXIS);
     const firingHandCameraAxis = firingHandAxis.clone()
+      .applyQuaternion(referenceWorldQuaternion).applyQuaternion(inverseCamera).normalize();
+    const firingSilhouetteCameraAxis = firingSilhouetteAxis.clone()
       .applyQuaternion(referenceWorldQuaternion).applyQuaternion(inverseCamera).normalize();
     const firingForearmCameraAxis = firingForearmAxis.clone()
       .applyQuaternion(referenceWorldQuaternion).applyQuaternion(inverseCamera).normalize();
     const firingUpperArmCameraAxis = firingUpperArmAxis.clone()
       .applyQuaternion(referenceWorldQuaternion).applyQuaternion(inverseCamera).normalize();
+    const indexBase = localPosition(this.rig.right.indexBase);
     const indexMiddle = localPosition(this.rig.right.indexMiddle);
     const indexDistal = localPosition(this.rig.right.indexDistal);
+    const indexDistalAxis = localDirection(this.rig.right.indexDistal, X_AXIS);
     const indexSegment = indexDistal.clone().sub(indexMiddle);
     const contactOffset = TRIGGER_CONTACT.clone().sub(indexMiddle);
     const contactT = THREE.MathUtils.clamp(
@@ -687,9 +742,25 @@ export class FirstPersonHands {
       0,
       1,
     );
-    const closestContact = indexMiddle.clone().addScaledVector(indexSegment, contactT);
+    const middleClosestContact = indexMiddle.clone().addScaledVector(indexSegment, contactT);
+    const distalLength = Math.max(1e-6, indexSegment.length());
+    const distalContactOffset = TRIGGER_CONTACT.clone().sub(indexDistal);
+    const distalContactDistance = THREE.MathUtils.clamp(
+      distalContactOffset.dot(indexDistalAxis),
+      0,
+      distalLength,
+    );
+    const distalClosestContact = indexDistal.clone()
+      .addScaledVector(indexDistalAxis, distalContactDistance);
+    const closestContact = middleClosestContact.distanceToSquared(TRIGGER_CONTACT) <=
+      distalClosestContact.distanceToSquared(TRIGGER_CONTACT)
+      ? middleClosestContact
+      : distalClosestContact;
     const firingMiddleBase = localPosition(this.rig.right.middleBase);
     const firingMiddleDistal = localPosition(this.rig.right.middleDistal);
+    const firingThumbBase = localPosition(this.rig.right.thumbBase);
+    const firingThumbMiddle = localPosition(this.rig.right.thumbMiddle);
+    const firingThumbDistal = localPosition(this.rig.right.thumbDistal);
 
     const supportWrist = localPosition(this.rig.left.hand);
     const supportPalmNormal = localDirection(this.rig.left.hand, new THREE.Vector3(0, 1, 0));
@@ -715,13 +786,17 @@ export class FirstPersonHands {
         shoulder: firingShoulder.toArray(),
         wristError: firingWrist.distanceTo(TRIGGER_GRIP),
         handAxis: firingHandAxis.toArray(),
+        silhouetteAxis: firingSilhouetteAxis.toArray(),
         forearmAxis: firingForearmAxis.toArray(),
         handCameraAxis: firingHandCameraAxis.toArray(),
+        silhouetteCameraAxis: firingSilhouetteCameraAxis.toArray(),
         forearmCameraAxis: firingForearmCameraAxis.toArray(),
         upperArmCameraAxis: firingUpperArmCameraAxis.toArray(),
         uprightApproach: -firingHandAxis.y,
         rearwardRake: firingHandAxis.z,
-        handBoneAlignment: 'slight_diagonal',
+        handBoneAlignment: 'weapon_parallel_from_above',
+        rearViewSilhouetteSlope: Math.abs(firingSilhouetteCameraAxis.x) /
+          Math.max(1e-6, Math.abs(firingSilhouetteCameraAxis.y)),
         handForearmAlignmentDot: firingHandAxis.dot(firingForearmAxis),
         handPairAlignmentDot: firingHandAxis.dot(supportHandAxis),
         forearmVerticalDelta: firingWrist.y - firingElbow.y,
@@ -730,11 +805,31 @@ export class FirstPersonHands {
         handTiltDegrees: THREE.MathUtils.radToDeg(this.firingHandTilt),
         palmNormal: firingPalmNormal.toArray(),
         palmVerticality: 1 - Math.min(1, Math.abs(firingPalmNormal.y)),
+        topViewSlope: Math.abs(firingHandAxis.x) /
+          Math.max(1e-6, Math.abs(firingHandAxis.z)),
+        indexBase: indexBase.toArray(),
         indexMiddle: indexMiddle.toArray(),
         indexDistal: indexDistal.toArray(),
+        indexDistalAxis: indexDistalAxis.toArray(),
+        indexKnuckleLeft: indexMiddle.x - indexBase.x,
+        indexOverallLeft: indexDistal.x - indexBase.x,
+        indexLateralClosure: indexDistal.x - indexMiddle.x,
+        indexPadAlignment: indexDistalAxis.dot(
+          TRIGGER_FINGER_PAD.clone().sub(indexDistal).normalize(),
+        ),
         triggerContactDistance: closestContact.distanceTo(TRIGGER_CONTACT),
         triggerContactT: contactT,
+        triggerDistalContactT: distalContactDistance / distalLength,
         gripWrap: firingMiddleBase.x - firingMiddleDistal.x,
+        middleBase: firingMiddleBase.toArray(),
+        middleDistal: firingMiddleDistal.toArray(),
+        visibleGripSlope: Math.abs(firingMiddleBase.x - firingMiddleDistal.x) /
+          Math.max(1e-6, Math.abs(firingMiddleBase.y - firingMiddleDistal.y)),
+        thumbBase: firingThumbBase.toArray(),
+        thumbMiddle: firingThumbMiddle.toArray(),
+        thumbDistal: firingThumbDistal.toArray(),
+        thumbRearClearance: firingThumbMiddle.z - PISTOL_GRIP_REAR_Z,
+        thumbHooksAcrossGrip: firingThumbDistal.x < firingThumbMiddle.x,
       },
       support: {
         wrist: supportWrist.toArray(),
@@ -742,14 +837,21 @@ export class FirstPersonHands {
         handAxis: supportHandAxis.toArray(),
         palmNormal: supportPalmNormal.toArray(),
         palmVerticality: 1 - Math.min(1, Math.abs(supportPalmNormal.y)),
+        palmUpAlignment: supportPalmNormal.y,
+        crossBarrelAlignment: supportHandAxis.x,
         forwardAlignment: -supportHandAxis.z,
         inwardWrap: supportMiddleDistal.x - supportMiddleBase.x,
+        upwardWrap: supportMiddleDistal.y - supportMiddleBase.y,
         middleBase: supportMiddleBase.toArray(),
         middleDistal: supportMiddleDistal.toArray(),
         thumbBase: supportThumbBase.toArray(),
         thumbMiddle: supportThumbMiddle.toArray(),
         thumbDistal: supportThumbDistal.toArray(),
         thumbFarSide: supportThumbDistal.x,
+        thumbInwardWrap: supportThumbDistal.x - supportThumbBase.x,
+        thumbBarrelHeight: supportThumbDistal.y,
+        thumbDownwardCurl: supportThumbDistal.y - supportThumbMiddle.y,
+        thumbForwardLean: supportThumbDistal.z - supportThumbBase.z,
         thumbOppositionDot: supportThumbAxis.dot(supportOpposingFingerAxis),
         thumbPinkySeparation: supportThumbBase.y - supportPinky.y,
         verticalSpread: supportThumbBase.y - supportPinky.y,
@@ -860,7 +962,9 @@ export class FirstPersonHands {
       this._basisY.normalize();
       this._basisZ.crossVectors(this._towardTarget, this._basisY).normalize();
       this._elbowDirection.set(1, 0, 0).applyQuaternion(this._worldQuaternion);
-      if (this._basisZ.dot(this._elbowDirection) < 0) this._basisZ.negate();
+      if (!this._rightElbowPoleValid && this._basisZ.dot(this._elbowDirection) < 0) {
+        this._basisZ.negate();
+      }
       this._elbow.copy(this._shoulder).addScaledVector(this._towardTarget, along);
       const verticalShare = THREE.MathUtils.clamp(
         (this._target.copy(target).sub(this._elbow).dot(this._cameraUpWorld) - 0.075) /
@@ -868,9 +972,24 @@ export class FirstPersonHands {
         -0.98,
         0.98,
       );
+      const lateralShare = Math.sqrt(Math.max(0, 1 - verticalShare * verticalShare));
       this._elbowDirection.copy(this._basisY).multiplyScalar(verticalShare)
-        .addScaledVector(this._basisZ, Math.sqrt(Math.max(0, 1 - verticalShare * verticalShare)))
+        .addScaledVector(this._basisZ, lateralShare)
         .normalize();
+      if (this._rightElbowPoleValid) {
+        // The elbow circle has two equally valid lateral solutions. Choosing
+        // their sign from a moving camera/weapon basis can cross zero during
+        // Shift and swap the rear arm to the opposite side for one frame.
+        // Compare both candidates to the last solved pole and stay on the
+        // closest hemisphere, preserving the lowered vertical component.
+        this._elbowAlternate.copy(this._basisY).multiplyScalar(verticalShare)
+          .addScaledVector(this._basisZ, -lateralShare)
+          .normalize();
+        if (this._elbowAlternate.dot(this._rightElbowPoleWorld) >
+            this._elbowDirection.dot(this._rightElbowPoleWorld)) {
+          this._elbowDirection.copy(this._elbowAlternate);
+        }
+      }
       if (this.weaponRoot?.isObject3D && sprint > 0) {
         // On the reachable elbow circle, choose the point closest to a forearm
         // aimed along the folded rifle. This rotates the complete rear arm,
@@ -882,9 +1001,21 @@ export class FirstPersonHands {
         this._target.addScaledVector(this._towardTarget, -this._target.dot(this._towardTarget));
         if (this._target.lengthSq() > 1e-8) {
           this._target.normalize();
-          this._elbowDirection.lerp(this._target, smooth01(sprint)).normalize();
+          // This projected sprint pole is also sign-ambiguous. Keep it on the
+          // same hemisphere as the last solved rear elbow before blending;
+          // otherwise the projection reverses near the early sprint crossing
+          // and defeats the continuous base-circle choice above.
+          if (this._rightElbowPoleValid && this._target.dot(this._rightElbowPoleWorld) < 0) {
+            this._target.negate();
+          }
+          // Preserve part of the lowered-elbow solve while folding the arm
+          // toward the rifle. A full replacement made the sprint elbow rise
+          // level with the wrist even though the glove stayed attached.
+          this._elbowDirection.lerp(this._target, 0.78 * smooth01(sprint)).normalize();
         }
       }
+      this._rightElbowPoleWorld.copy(this._elbowDirection);
+      this._rightElbowPoleValid = true;
     } else {
       // The support elbow retains its lower, relaxed bend around the handguard.
       const elbowVertical = -0.2 - 0.12 * sprint;
@@ -968,7 +1099,7 @@ export class FirstPersonHands {
       // curl. Re-curling it here and partially aiming it afterward produced a
       // stable but incorrect 17 mm miss at normal 60 Hz response weights.
       if (side === 'right' && finger === 1) continue;
-      if (side === 'left' && finger === 0 && excludeThumb) continue;
+      if (finger === 0 && excludeThumb) continue;
       // Rocketbox names the three segments Finger1, Finger11, Finger12 (and
       // equivalently 0/2/3/4). Length-based parsing collapsed the latter two
       // onto one segment; read the final digit so every real phalanx is posed.

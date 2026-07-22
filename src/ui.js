@@ -87,9 +87,9 @@ export class UI {
     this.lastObjective = '';
     this.inGame = false;
     this.hudState = {
-      health: 100,
-      maxHealth: 100,
-      armor: 50,
+      health: 120,
+      maxHealth: 120,
+      armor: 120,
       ammo: 30,
       reserve: 120,
     };
@@ -150,8 +150,8 @@ export class UI {
     if (incoming.reserve == null && incoming.ammoReserve != null) incoming.reserve = incoming.ammoReserve;
     this.hudState = { ...this.hudState, ...incoming };
     state = this.hudState;
-    const health = clamp(Number(state.health ?? 100) || 0, 0, Number(state.maxHealth ?? 100) || 100);
-    const maxHealth = Math.max(1, Number(state.maxHealth ?? 100) || 100);
+    const health = clamp(Number(state.health ?? 120) || 0, 0, Number(state.maxHealth ?? 120) || 120);
+    const maxHealth = Math.max(1, Number(state.maxHealth ?? 120) || 120);
     const healthPercent = clamp((health / maxHealth) * 100, 0, 100);
     const armor = Math.max(0, Math.round(Number(state.armor ?? 0) || 0));
     const current = Math.max(0, Math.round(Number(state.ammo ?? state.ammoCurrent ?? 0) || 0));

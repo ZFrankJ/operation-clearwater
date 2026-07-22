@@ -2,8 +2,8 @@ export const DIFFICULTY_PROFILES = Object.freeze({
   easy: Object.freeze({
     id: 'easy',
     label: 'EASY',
-    playerHealth: 100,
-    startingArmor: 60,
+    playerHealth: 150,
+    startingArmor: 150,
     enemyHealthMultiplier: 1,
     enemyAccuracyMultiplier: 1.2,
     oneLife: false,
@@ -12,8 +12,8 @@ export const DIFFICULTY_PROFILES = Object.freeze({
   normal: Object.freeze({
     id: 'normal',
     label: 'NORMAL',
-    playerHealth: 85,
-    startingArmor: 50,
+    playerHealth: 120,
+    startingArmor: 120,
     enemyHealthMultiplier: 1.2,
     enemyAccuracyMultiplier: 0.92,
     oneLife: false,
@@ -22,8 +22,8 @@ export const DIFFICULTY_PROFILES = Object.freeze({
   hard: Object.freeze({
     id: 'hard',
     label: 'HARD',
-    playerHealth: 70,
-    startingArmor: 35,
+    playerHealth: 100,
+    startingArmor: 100,
     enemyHealthMultiplier: 1.45,
     enemyAccuracyMultiplier: 0.62,
     oneLife: true,
@@ -32,8 +32,8 @@ export const DIFFICULTY_PROFILES = Object.freeze({
   extreme: Object.freeze({
     id: 'extreme',
     label: 'EXTREME',
-    playerHealth: 55,
-    startingArmor: 20,
+    playerHealth: 75,
+    startingArmor: 75,
     enemyHealthMultiplier: 1.8,
     enemyAccuracyMultiplier: 0.4,
     oneLife: true,

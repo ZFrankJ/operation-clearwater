@@ -236,8 +236,8 @@ button { cursor: pointer; }
 .health-track i.critical { background: linear-gradient(90deg, #9c2828, var(--danger)); box-shadow: 0 0 10px rgba(228,91,78,.7); }
 .health-row strong, .armor-row strong { font-size: 9px; font-variant-numeric: tabular-nums; }
 .armor-row { margin-top: 5px; }
-.armor-row b { display: flex; gap: 3px; }
-.armor-row b i { width: 34px; height: 3px; transform: skewX(-22deg); background: #759ba5; }
+.armor-row b { display: flex; width: 150px; gap: 3px; }
+.armor-row b i { flex: 1 1 0; min-width: 0; height: 3px; transform: skewX(-22deg); background: #759ba5; }
 .ammo-card { right: 28px; text-align: right; padding-right: 13px; border-right: 2px solid rgba(101,217,230,.7); }
 .ammo-readout { margin-top: 5px; display: flex; align-items: baseline; justify-content: flex-end; gap: 7px; font-variant-numeric: tabular-nums; }
 .ammo-readout strong { font-size: 48px; line-height: .9; letter-spacing: -.05em; }

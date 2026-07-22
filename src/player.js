@@ -74,12 +74,12 @@ export class PlayerController {
     this.velocity = new THREE.Vector3();
     this.checkpoint = this.position.clone();
 
-    this.maxHealth = 100;
-    this.maxArmor = 100;
-    this.health = 100;
-    this.armor = 60;
-    this.difficulty = 'easy';
-    this.startingArmor = 60;
+    this.maxHealth = 120;
+    this.maxArmor = 120;
+    this.health = 120;
+    this.armor = 120;
+    this.difficulty = 'normal';
+    this.startingArmor = 120;
     this.alive = true;
     this.lowHealthThreshold = 0.35;
     this.minimumMobility = 0.58;
@@ -200,13 +200,18 @@ export class PlayerController {
   setDifficulty(profile = {}) {
     const previousMax = Math.max(1, this.maxHealth);
     const healthRatio = this.alive ? this.health / previousMax : 0;
-    this.difficulty = String(profile.id ?? 'easy');
-    this.maxHealth = Math.max(1, numberOr(profile.playerHealth, 100));
-    this.startingArmor = THREE.MathUtils.clamp(numberOr(profile.startingArmor, 60), 0, this.maxArmor);
+    const previousMaxArmor = Math.max(1, this.maxArmor);
+    const armorRatio = this.alive ? this.armor / previousMaxArmor : 0;
+    this.difficulty = String(profile.id ?? 'normal');
+    this.maxHealth = Math.max(1, numberOr(profile.playerHealth, 120));
+    this.maxArmor = Math.max(0, numberOr(profile.startingArmor, 120));
+    this.startingArmor = this.maxArmor;
     this.health = this.alive
       ? THREE.MathUtils.clamp(this.maxHealth * healthRatio, 1, this.maxHealth)
       : 0;
-    this.armor = Math.min(this.armor, this.startingArmor);
+    this.armor = this.alive
+      ? THREE.MathUtils.clamp(this.maxArmor * armorRatio, 0, this.maxArmor)
+      : 0;
     return this.getState();
   }
 
@@ -220,7 +225,9 @@ export class PlayerController {
     this.yaw = numberOr(options.yaw, this.checkpointYaw);
     this.pitch = THREE.MathUtils.clamp(numberOr(options.pitch, this.checkpointPitch), -1.52, 1.52);
     this.health = options.keepHealth ? Math.max(1, this.health) : this.maxHealth;
-    this.armor = options.keepArmor ? this.armor : numberOr(options.armor, this.startingArmor);
+    this.armor = options.keepArmor
+      ? THREE.MathUtils.clamp(this.armor, 0, this.maxArmor)
+      : THREE.MathUtils.clamp(numberOr(options.armor, this.startingArmor), 0, this.maxArmor);
     this.alive = true;
     this.deathElapsed = 0;
     this.deathSide = 1;

@@ -70,7 +70,7 @@ appropriate distribution channel for its offline edition.
 - `Space` — jump / short vault
 - `Esc` — pause and release mouse
 
-The home difficulty selector offers **Easy**, **Normal**, **Hard**, and **Extreme**, with **Normal selected by default**. Easy preserves the forgiving original balance. Each harder setting progressively raises hostile health and accuracy while reducing player health; Hard is a genuine one-life run. Extreme is also one-life: enemies wear concealed ballistic vests, headshots are lethal, and body shots cause only limited damage.
+The home difficulty selector offers **Easy**, **Normal**, **Hard**, and **Extreme**, with **Normal selected by default**. Player vitality and plate capacity are **150 / 150** on Easy, **120 / 120** on Normal, **100 / 100** on Hard, and **75 / 75** on Extreme. Each harder setting also progressively raises hostile health and accuracy; Hard is a genuine one-life run. Extreme is also one-life: enemies wear concealed ballistic vests, headshots are lethal, and body shots cause only limited damage.
 
 ## Mission route
 

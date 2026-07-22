@@ -116,6 +116,7 @@ for (const asset of natureModels) {
 }
 
 const html = await readFile(join(root, 'index.html'), 'utf8');
+const styleSource = await readFile(join(root, 'src/style.css'), 'utf8');
 const robotsSource = await readFile(join(root, 'robots.txt'), 'utf8');
 const packageManifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 const readmeSource = await readFile(join(root, 'README.md'), 'utf8');
@@ -188,6 +189,13 @@ assert(
 assert(
   /<kbd>C \/ CTRL<\/kbd><span>CROUCH \/ CRAWL<\/span>/.test(html),
   'home controls visibly document the C or Control crouch/crawl action',
+);
+assert(
+  /id=["']health-value["']>120<\/strong>/.test(html) &&
+    /id=["']armor-pips["']>(?:<i><\/i>){6}<\/b><strong id=["']armor-value["']>120<\/strong>/.test(html) &&
+    /\.armor-row b\s*\{[^}]*width:\s*150px/.test(styleSource) &&
+    /\.armor-row b i\s*\{[^}]*flex:\s*1 1 0/.test(styleSource),
+  'the default Normal HUD shows 120 vitality and plate with six scalable 25-point plate segments',
 );
 assert(
   !/operator-dossier|operator-portrait|VCS-4 SERVICE CARBINE/.test(html) &&
@@ -837,7 +845,6 @@ assert(
   'critical health reduces locomotion and death plays a complete camera fall before checkpoint or hard-mode resolution',
 );
 const uiSource = await readFile(join(root, 'src/ui.js'), 'utf8');
-const styleSource = await readFile(join(root, 'src/style.css'), 'utf8');
 
 assert(
   /deathVeil:\s*['"]death-veil['"]/.test(uiSource) &&
@@ -1073,14 +1080,17 @@ assert(
     /function saveCheckpoint\([\s\S]*?!isOneLifeDifficulty\(difficulty\)[\s\S]*?setCheckpoint/.test(mainSource) &&
     /onDeath:[\s\S]*?isOneLifeDifficulty\(difficulty\)[\s\S]*?beginHardFailure\(['"]operator_down['"]\)/.test(mainSource) &&
     /onFall:[\s\S]*?beginHardFailure\(['"]operator_fell['"]\)[\s\S]*?return true/.test(mainSource) &&
-    /easy:[\s\S]*?playerHealth:\s*100[\s\S]*?enemyHealthMultiplier:\s*1[\s\S]*?normal:[\s\S]*?playerHealth:\s*85[\s\S]*?enemyHealthMultiplier:\s*1\.2/.test(difficultySource) &&
+    /easy:[\s\S]*?playerHealth:\s*150[\s\S]*?startingArmor:\s*150[\s\S]*?enemyHealthMultiplier:\s*1[\s\S]*?normal:[\s\S]*?playerHealth:\s*120[\s\S]*?startingArmor:\s*120[\s\S]*?enemyHealthMultiplier:\s*1\.2/.test(difficultySource) &&
     /getDifficultyProfile\(value = ['"]normal['"]\)/.test(difficultySource) &&
     /easy:[\s\S]*?enemyAccuracyMultiplier:\s*1\.2[\s\S]*?normal:[\s\S]*?enemyAccuracyMultiplier:\s*0\.92[\s\S]*?hard:[\s\S]*?enemyAccuracyMultiplier:\s*0\.62[\s\S]*?extreme:[\s\S]*?enemyAccuracyMultiplier:\s*0\.4/.test(difficultySource) &&
     /const spread = this\._shotSpread\([\s\S]*?this\.enemyAccuracyMultiplier/.test(enemiesSource) &&
-    /hard:[\s\S]*?playerHealth:\s*70[\s\S]*?enemyHealthMultiplier:\s*1\.45[\s\S]*?oneLife:\s*true/.test(difficultySource) &&
-    /extreme:[\s\S]*?playerHealth:\s*55[\s\S]*?enemyHealthMultiplier:\s*1\.8[\s\S]*?concealedVests:\s*true/.test(difficultySource) &&
+    /hard:[\s\S]*?playerHealth:\s*100[\s\S]*?startingArmor:\s*100[\s\S]*?enemyHealthMultiplier:\s*1\.45[\s\S]*?oneLife:\s*true/.test(difficultySource) &&
+    /extreme:[\s\S]*?playerHealth:\s*75[\s\S]*?startingArmor:\s*75[\s\S]*?enemyHealthMultiplier:\s*1\.8[\s\S]*?concealedVests:\s*true/.test(difficultySource) &&
+    /this\.maxArmor\s*=\s*Math\.max\(0, numberOr\(profile\.startingArmor, 120\)\)/.test(playerSource) &&
+    /this\.armor\s*=\s*this\.alive[\s\S]*?this\.maxArmor \* armorRatio/.test(playerSource) &&
+    /maxArmor:\s*qaPlayerState\.maxArmor/.test(mainSource) &&
     /if \(handled !== true\) this\.reset\(this\.checkpoint\)/.test(playerSource),
-  'Normal is the default while harder settings progressively shift health, accuracy, and one-life rules',
+  'Normal is the default with the requested paired vitality/plate capacities while harder settings retain accuracy and one-life rules',
 );
 assert(
   /let difficulty\s*=\s*getDifficultyProfile\(params\.get\(['"]difficulty['"]\)\)\.id/.test(mainSource) &&
@@ -1296,6 +1306,7 @@ assert(
   /function dampAndSnap\(current, target, lambda, dt, epsilon = 1e-5\)/.test(handsSource) &&
     /this\.model\.position\.x = dt > 0[\s\S]*?dampAndSnap\(this\.model\.position\.x, armatureX, 24, dt\)/.test(handsUpdateSource) &&
     /this\.model\.position\.y = dt > 0[\s\S]*?dampAndSnap\(this\.model\.position\.y, armatureY, 24, dt\)/.test(handsUpdateSource) &&
+    /this\.model\.position\.z = dt > 0[\s\S]*?dampAndSnap\(this\.model\.position\.z, armatureZ, 24, dt\)/.test(handsUpdateSource) &&
     /this\.root\.position\.x = dampAndSnap\(this\.root\.position\.x/.test(handsUpdateSource) &&
     /this\.root\.position\.y = dampAndSnap\(this\.root\.position\.y/.test(handsUpdateSource) &&
     /this\.root\.rotation\.z = dampAndSnap\(this\.root\.rotation\.z/.test(handsUpdateSource),
@@ -1311,32 +1322,43 @@ const triggerWrist = vector3Constant('TRIGGER_GRIP');
 const supportWrist = vector3Constant('SUPPORT_GRIP');
 const firingHandAxis = vector3Constant('FIRING_HAND_AXIS');
 const firingPalmNormal = vector3Constant('FIRING_PALM_NORMAL');
+const firingThumbBridge = vector3Constant('FIRING_THUMB_BRIDGE');
+const firingThumbContact = vector3Constant('FIRING_THUMB_CONTACT');
+const firingThumbPad = vector3Constant('FIRING_THUMB_PAD');
 const supportHandAxis = vector3Constant('SUPPORT_HAND_AXIS');
 const supportPalmNormal = vector3Constant('SUPPORT_PALM_NORMAL');
 const vectorNear = (actual, expected, epsilon = 0.001) => Boolean(actual) &&
   actual.every((value, index) => Math.abs(value - expected[index]) <= epsilon);
 assert(
   Boolean(triggerWrist && supportWrist) &&
-    vectorNear(triggerWrist, [0.06, -0.03, -0.061]) && vectorNear(supportWrist, [-0.048, -0.015, -0.205]) &&
+    vectorNear(triggerWrist, [0.024, -0.029, -0.015]) && vectorNear(supportWrist, [-0.058, 0.008, -0.288]) &&
     triggerWrist[1] <= supportWrist[1] + 0.01 && supportWrist[2] <= triggerWrist[2] - 0.1 &&
     Math.hypot(...triggerWrist.map((value, index) => value - supportWrist[index])) > 0.15,
-  'the firing wrist sits on the requested lower arm line while the support wrist remains forward on the handguard',
+  'the firing wrist seats against the pistol grip while the support wrist remains forward beneath the handguard',
 );
 assert(
-  vectorNear(firingHandAxis, [-0.657, 0.277, -0.701]) && vectorNear(firingPalmNormal, [0, 0, 1]) &&
-    vectorNear(supportHandAxis, [0, 0.25, -0.968]) && vectorNear(supportPalmNormal, [1, 0, 0]) &&
+  vectorNear(firingThumbBridge, [0.018, 0.022, -0.058]) &&
+    vectorNear(firingThumbContact, [-0.014, 0.02, -0.062]) &&
+    vectorNear(firingThumbPad, [-0.024, 0.012, -0.102]) &&
+    firingThumbBridge[2] > -0.08 && firingThumbContact[2] > -0.08 &&
+    firingThumbPad[0] < firingThumbContact[0] && firingThumbPad[2] < firingThumbContact[2],
+  'the firing thumb crosses visibly behind the grip before its pad closes forward on the far face',
+);
+assert(
+  vectorNear(firingHandAxis, [0, 0, -1]) && vectorNear(firingPalmNormal, [-1, 0, 0]) &&
+    vectorNear(supportHandAxis, [0.985, 0, -0.174]) && vectorNear(supportPalmNormal, [0, 1, 0]) &&
     /this\._weaponDirection\(FIRING_HAND_AXIS, this\._rightAxisWorld\)/.test(handsUpdateSource) &&
     /this\._weaponDirection\(FIRING_PALM_NORMAL, this\._rightPalmWorld\)/.test(handsUpdateSource) &&
     /this\._weaponDirection\(SUPPORT_HAND_AXIS, this\._leftAxisWorld\)/.test(handsUpdateSource) &&
     /this\._weaponDirection\(SUPPORT_PALM_NORMAL, this\._leftPalmWorld\)/.test(handsUpdateSource),
-  'the firing wrist approaches upward into the pistol grip while the support palm turns forward and inward around the handguard',
+  'the firing hand is rifle-parallel from above while the support hand crosses beneath the barrel with its palm facing up',
 );
 const poseProbeSource = handsSource.match(
   /getPoseProbe\(\)\s*\{([\s\S]*?)\n\s*\}\n\n\s*dispose\(\)/,
 )?.[1] ?? '';
 assert(
-  /version:\s*7/.test(handsSource) && /expectedFingerBones:\s*30/.test(handsSource) &&
-    /rearHandBoneAlignment:\s*['"]slight_diagonal['"]/.test(handsSource) &&
+  /version:\s*11/.test(handsSource) && /expectedFingerBones:\s*30/.test(handsSource) &&
+    /rearHandBoneAlignment:\s*['"]weapon_parallel_from_above['"]/.test(handsSource) &&
     /rearHandDownturnDegrees:\s*0/.test(handsSource) &&
     /rearHandTiltDegrees:\s*THREE\.MathUtils\.radToDeg\(FIRING_HAND_TILT\)/.test(handsSource) &&
     /immutable weapon-local[\s\S]*?this\._weaponDirection\(FIRING_HAND_AXIS, this\._rightAxisWorld\)/.test(handsUpdateSource) &&
@@ -1351,9 +1373,26 @@ assert(
     /this\._weaponDirection\(FIRING_HAND_AXIS, this\._rightAxisWorld\)/.test(handsUpdateSource) &&
     /this\._weaponDirection\(FIRING_PALM_NORMAL, this\._rightPalmWorld\)/.test(handsUpdateSource) &&
     /triggerContactDistance:\s*closestContact\.distanceTo\(TRIGGER_CONTACT\)/.test(poseProbeSource) &&
+    /triggerDistalContactT:\s*distalContactDistance \/ distalLength/.test(poseProbeSource) &&
+    /topViewSlope:\s*Math\.abs\(firingHandAxis\.x\)/.test(poseProbeSource) &&
+    /indexKnuckleLeft:\s*indexMiddle\.x - indexBase\.x/.test(poseProbeSource) &&
+    /indexOverallLeft:\s*indexDistal\.x - indexBase\.x/.test(poseProbeSource) &&
+    /indexLateralClosure:\s*indexDistal\.x - indexMiddle\.x/.test(poseProbeSource) &&
+    /indexPadAlignment:\s*indexDistalAxis\.dot/.test(poseProbeSource) &&
+    /silhouetteCameraAxis:\s*firingSilhouetteCameraAxis\.toArray\(\)/.test(poseProbeSource) &&
+    /rearViewSilhouetteSlope:\s*Math\.abs\(firingSilhouetteCameraAxis\.x\)/.test(poseProbeSource) &&
+    /thumbRearClearance:\s*firingThumbMiddle\.z - PISTOL_GRIP_REAR_Z/.test(poseProbeSource) &&
+    /thumbHooksAcrossGrip:\s*firingThumbDistal\.x < firingThumbMiddle\.x/.test(poseProbeSource) &&
     /uprightApproach:\s*-firingHandAxis\.y/.test(poseProbeSource) &&
     /thumbFarSide:\s*supportThumbDistal\.x/.test(poseProbeSource) &&
+    /thumbInwardWrap:\s*supportThumbDistal\.x - supportThumbBase\.x/.test(poseProbeSource) &&
+    /thumbBarrelHeight:\s*supportThumbDistal\.y/.test(poseProbeSource) &&
+    /thumbDownwardCurl:\s*supportThumbDistal\.y - supportThumbMiddle\.y/.test(poseProbeSource) &&
+    /thumbForwardLean:\s*supportThumbDistal\.z - supportThumbBase\.z/.test(poseProbeSource) &&
     /thumbOppositionDot:\s*supportThumbAxis\.dot\(supportOpposingFingerAxis\)/.test(poseProbeSource) &&
+    /palmUpAlignment:\s*supportPalmNormal\.y/.test(poseProbeSource) &&
+    /crossBarrelAlignment:\s*supportHandAxis\.x/.test(poseProbeSource) &&
+    /upwardWrap:\s*supportMiddleDistal\.y - supportMiddleBase\.y/.test(poseProbeSource) &&
     /supportTravel:\s*supportWrist\.distanceTo\(SUPPORT_GRIP\)/.test(poseProbeSource) &&
     /supportRise:\s*supportWrist\.y - SUPPORT_GRIP\.y/.test(poseProbeSource) &&
     /handPose:\s*\(\)\s*=>\s*safeCall\(weapon\?\.hands, ['"]getPoseProbe['"]\)/.test(mainSource) &&
@@ -1378,14 +1417,13 @@ const triggerIndexPose = rightFingerPoses.get(1);
 const littleFingerPose = rightFingerPoses.get(4);
 assert(
   Boolean(triggerIndexPose) && triggerIndexPose[0] >= 0.55 &&
-    triggerIndexPose[1] <= 0.2 && triggerIndexPose[2] <= 0.22 &&
+    triggerIndexPose[1] >= 0.4 && triggerIndexPose[2] >= 0.4 &&
     [2, 3, 4].every((finger) => {
       const wrap = rightFingerPoses.get(finger);
-      return wrap?.[0] >= 0.68 && wrap?.[1] >= triggerIndexPose[1] + 0.25 && wrap?.[1] <= 0.5 &&
-        wrap?.[2] >= triggerIndexPose[2] + 0.16 && wrap?.[2] <= 0.45 &&
+      return wrap?.[0] >= 0.9 && wrap?.[1] >= 1.0 && wrap?.[2] >= 0.95 &&
         wrap?.every((angle, segment) => Math.abs(angle - littleFingerPose[segment]) < 1e-6);
     }),
-  'the firing index stays on the trigger while the remaining three fingers use a restrained index-like grip bend',
+  'the firing index closes onto the trigger while the remaining three fingers share one tight circular grip bend',
 );
 const rocketboxFingerBones = new Set(
   handsFbxBytes.toString('latin1').match(/Bip01 [LR] Finger[0-4](?:[12])?(?!\d)/g) ?? [],
@@ -1402,8 +1440,15 @@ assert(
     /this\.fingerRest\.set\(bone, bone\.quaternion\.clone\(\)\)/.test(handsSource) &&
     /suffix\.length === 1[\s\S]*?\? 0[\s\S]*?Number\.parseInt\(suffix\.slice\(1\), 10\)[\s\S]*?1, 2/.test(fingerPoseMethodSource) &&
     /pose\?\.\[finger\]\?\.\[segment\]/.test(fingerPoseMethodSource) &&
-    /side === ['"]left['"] && finger === 0 && excludeThumb/.test(fingerPoseMethodSource),
-  'all 30 Rocketbox finger bones receive independent poses while the opposed support thumb uses its explicit solve',
+    /finger === 0 && excludeThumb/.test(fingerPoseMethodSource) &&
+    /this\._poseFingers\(['"]right['"],\s*1,\s*response,\s*true\)/.test(handsUpdateSource) &&
+    /this\._aimBoneXAxis\(this\.rig\.right\.indexBase, this\._triggerFingerGuideWorld, 1\)/.test(handsUpdateSource) &&
+    /this\._aimBoneXAxis\(this\.rig\.right\.indexMiddle, this\._triggerContactWorld, 1\)/.test(handsUpdateSource) &&
+    /this\._aimBoneXAxis\(this\.rig\.right\.indexDistal, this\._triggerFingerPadWorld, 1\)/.test(handsUpdateSource) &&
+    /this\._aimBoneXAxis\(this\.rig\.right\.thumbBase, this\._firingThumbBridgeWorld, 1\)/.test(handsUpdateSource) &&
+    /this\._aimBoneXAxis\(this\.rig\.right\.thumbMiddle, this\._firingThumbContactWorld, 1\)/.test(handsUpdateSource) &&
+    /this\._aimBoneXAxis\(this\.rig\.right\.thumbDistal, this\._firingThumbPadWorld, 1\)/.test(handsUpdateSource),
+  'all 30 Rocketbox finger bones receive independent poses while both thumbs use explicit surface-wrap solves',
 );
 assert(
   /this\.magazine\.getWorldPosition\(this\._magazineWorld\)/.test(handsUpdateSource) &&
@@ -1488,7 +1533,14 @@ globalThis.fetch = async (input, init) => {
 
 let executableHands = null;
 let baseHandPose = null;
+let aimHandPose = null;
 let sprintHandPose = null;
+let maxSprintRearElbowStep = 0;
+let maxSprintRearArmTurnDegrees = 0;
+let maxSprintRearElbowStepFrame = -1;
+let maxSprintRearElbowStepBlend = 0;
+let maxSprintRearElbowStepFrom = null;
+let maxSprintRearElbowStepTo = null;
 let maxReloadSupportTravel = 0;
 let maxReloadSupportRise = 0;
 let handPoseProbeError = null;
@@ -1510,6 +1562,18 @@ try {
   });
   baseHandPose = executableHands.getPoseProbe();
 
+  poseWeaponRoot.position.set(0, -0.14, -0.405);
+  poseWeaponRoot.rotation.set(0, 0, 0, 'YXZ');
+  poseWeaponRoot.updateMatrixWorld(true);
+  executableHands.update(0, {
+    enabled: true,
+    ads: 1,
+    sprint: 0,
+    reloading: false,
+    reloadProgress: 0,
+  });
+  aimHandPose = executableHands.getPoseProbe();
+
   poseWeaponRoot.position.set(0.08, -0.24, -0.3);
   poseWeaponRoot.rotation.set(-0.42, 0.3, 0.55, 'YXZ');
   poseWeaponRoot.updateMatrixWorld(true);
@@ -1521,6 +1585,102 @@ try {
     reloadProgress: 0,
   });
   sprintHandPose = executableHands.getPoseProbe();
+
+  // Reproduce the real Shift transition instead of teleporting straight to
+  // the final sprint pose. The weapon and hand solver receive separately
+  // damped blends in production, so a discontinuous elbow-pole choice only
+  // appears while crossing the intermediate orientations.
+  const transitionHipPosition = new PoseTHREE.Vector3(0.255, -0.255, -0.37);
+  const transitionSprintPosition = new PoseTHREE.Vector3(0.08, -0.24, -0.3);
+  const transitionTargetPosition = new PoseTHREE.Vector3();
+  const transitionTargetEuler = new PoseTHREE.Euler(0, 0, 0, 'YXZ');
+  const transitionTargetQuaternion = new PoseTHREE.Quaternion();
+  let transitionSprintBlend = 0;
+  poseWeaponRoot.position.copy(transitionHipPosition);
+  poseWeaponRoot.quaternion.identity();
+  poseWeaponRoot.updateMatrixWorld(true);
+  executableHands.update(0, {
+    enabled: true,
+    ads: 0,
+    sprint: 0,
+    reloading: false,
+    reloadProgress: 0,
+  });
+  let previousTransitionPose = executableHands.getPoseProbe();
+  for (let step = 0; step < 540; step += 1) {
+    const enteringSprint = step % 180 < 90;
+    const sprintTarget = enteringSprint ? 1 : 0;
+    const sprintLambda = enteringSprint ? 12 : 16;
+    transitionSprintBlend = PoseTHREE.MathUtils.damp(
+      transitionSprintBlend,
+      sprintTarget,
+      sprintLambda,
+      1 / 60,
+    );
+    transitionTargetPosition.copy(transitionHipPosition)
+      .lerp(transitionSprintPosition, transitionSprintBlend);
+    poseWeaponRoot.position.x = PoseTHREE.MathUtils.damp(
+      poseWeaponRoot.position.x,
+      transitionTargetPosition.x,
+      17,
+      1 / 60,
+    );
+    poseWeaponRoot.position.y = PoseTHREE.MathUtils.damp(
+      poseWeaponRoot.position.y,
+      transitionTargetPosition.y,
+      17,
+      1 / 60,
+    );
+    poseWeaponRoot.position.z = PoseTHREE.MathUtils.damp(
+      poseWeaponRoot.position.z,
+      transitionTargetPosition.z,
+      24,
+      1 / 60,
+    );
+    transitionTargetEuler.set(
+      -0.42 * transitionSprintBlend,
+      0.3 * transitionSprintBlend,
+      0.55 * transitionSprintBlend,
+      'YXZ',
+    );
+    transitionTargetQuaternion.setFromEuler(transitionTargetEuler);
+    poseWeaponRoot.quaternion.slerp(
+      transitionTargetQuaternion,
+      1 - Math.exp(-18 / 60),
+    );
+    poseWeaponRoot.updateMatrixWorld(true);
+    executableHands.update(1 / 60, {
+      enabled: true,
+      ads: 0,
+      sprint: transitionSprintBlend,
+      reloading: false,
+      reloadProgress: 0,
+    });
+    const transitionPose = executableHands.getPoseProbe();
+    const elbowStep = Math.hypot(...transitionPose.firing.elbow.map(
+      (value, index) => value - previousTransitionPose.firing.elbow[index],
+    ));
+    const forearmDot = PoseTHREE.MathUtils.clamp(
+      transitionPose.firing.forearmAxis.reduce(
+        (sum, value, index) => sum + value * previousTransitionPose.firing.forearmAxis[index],
+        0,
+      ),
+      -1,
+      1,
+    );
+    if (elbowStep > maxSprintRearElbowStep) {
+      maxSprintRearElbowStep = elbowStep;
+      maxSprintRearElbowStepFrame = step;
+      maxSprintRearElbowStepBlend = transitionSprintBlend;
+      maxSprintRearElbowStepFrom = [...previousTransitionPose.firing.elbow];
+      maxSprintRearElbowStepTo = [...transitionPose.firing.elbow];
+    }
+    maxSprintRearArmTurnDegrees = Math.max(
+      maxSprintRearArmTurnDegrees,
+      PoseTHREE.MathUtils.radToDeg(Math.acos(forearmDot)),
+    );
+    previousTransitionPose = transitionPose;
+  }
 
   poseWeaponRoot.position.set(0, 0, 0);
   poseWeaponRoot.rotation.set(0, 0, 0, 'YXZ');
@@ -1548,27 +1708,42 @@ try {
   else delete globalThis.document;
 }
 assert(
-  !handPoseProbeError && baseHandPose?.ready && baseHandPose.contract?.version === 7 &&
-    baseHandPose.fingerBoneCount === 30 && baseHandPose.firing.handBoneAlignment === 'slight_diagonal' &&
+  !handPoseProbeError && baseHandPose?.ready && baseHandPose.contract?.version === 11 &&
+    baseHandPose.fingerBoneCount === 30 && baseHandPose.firing.handBoneAlignment === 'weapon_parallel_from_above' &&
     baseHandPose.firing.handDownturnDegrees === 0 &&
-    baseHandPose.firing.handTiltDegrees === 7 &&
-    baseHandPose.firing.handForearmAlignmentDot >= 0.99 &&
+    baseHandPose.firing.handTiltDegrees === 0 &&
+    baseHandPose.firing.rearViewSilhouetteSlope <= 0.02 &&
+    baseHandPose.firing.topViewSlope <= 0.02 &&
     baseHandPose.firing.elbowLowered === true &&
     baseHandPose.firing.forearmVerticalDelta >= 0.06 && baseHandPose.firing.forearmVerticalDelta <= 0.09 &&
-    baseHandPose.firing.triggerContactDistance <= 0.012,
-  `the executable Rocketbox probe lowers the rear elbow, preserves hand/forearm alignment, and retains trigger contact (${JSON.stringify(baseHandPose?.firing ?? null)})`,
+    baseHandPose.firing.triggerContactDistance <= 0.003 &&
+    baseHandPose.firing.triggerContactT > 0.8 &&
+    baseHandPose.firing.indexKnuckleLeft <= -0.01 &&
+    baseHandPose.firing.indexOverallLeft <= -0.005 &&
+    baseHandPose.firing.indexPadAlignment >= 0.98 &&
+    baseHandPose.firing.thumbHooksAcrossGrip === true &&
+    baseHandPose.firing.thumbRearClearance >= -0.01,
+  `the executable Rocketbox probe keeps the rear hand vertical from above, tightly hooks the trigger, and retains the thumb wrap (${JSON.stringify(baseHandPose?.firing ?? null)})`,
 );
 assert(
-  !handPoseProbeError && baseHandPose?.support.forwardAlignment >= 0.9 &&
-    baseHandPose.support.thumbFarSide <= -0.015 && baseHandPose.support.middleDistal[0] >= 0 &&
-    baseHandPose.support.thumbOppositionDot < 0 && baseHandPose.support.thumbPinkySeparation >= 0.025,
-  'the executable Rocketbox probe places the support thumb on the far side, opposed to fingers wrapped around the near side',
+  !handPoseProbeError && baseHandPose?.support.crossBarrelAlignment >= 0.98 &&
+    baseHandPose.support.palmUpAlignment >= 0.98 && baseHandPose.support.upwardWrap >= 0.04 &&
+    baseHandPose.support.thumbInwardWrap >= 0.015 && baseHandPose.support.thumbBarrelHeight <= 0.03 &&
+    baseHandPose.support.thumbDownwardCurl <= -0.01 && baseHandPose.support.thumbForwardLean <= -0.003 &&
+    baseHandPose.support.thumbOppositionDot < 0 &&
+    baseHandPose.support.wristError <= 0.005,
+  'the executable Rocketbox probe keeps a raised diagonal support palm beneath the barrel while its fingers curl upward and its thumb hooks inward, forward, and down around the handguard',
+);
+assert(
+  !handPoseProbeError && aimHandPose?.ready && aimHandPose.firing.wristError <= 0.005 &&
+    aimHandPose.support.wristError <= 0.005 && aimHandPose.firing.topViewSlope <= 0.02 &&
+    aimHandPose.firing.triggerContactDistance <= 0.003,
+  `the ADS armature keeps both hands and the trigger finger attached to the rifle (${JSON.stringify(aimHandPose ?? null)})`,
 );
 assert(
   !handPoseProbeError && sprintHandPose?.sprint.blend === 1 &&
-    sprintHandPose.firing.handForearmAlignmentDot >= 0.85 &&
-    sprintHandPose.firing.elbowLowered === true &&
-    sprintHandPose.firing.forearmVerticalDelta > 0 && sprintHandPose.firing.forearmVerticalDelta <= 0.18 &&
+    sprintHandPose.firing.handForearmAlignmentDot >= 0.9 &&
+    sprintHandPose.firing.forearmVerticalDelta >= -0.03 && sprintHandPose.firing.forearmVerticalDelta <= 0.18 &&
     sprintHandPose.sprint.handPose === 'same_as_hip_weapon_local' &&
     sprintHandPose.firing.handAxis.every((value, index) =>
       Math.abs(value - baseHandPose.firing.handAxis[index]) <= 0.001) &&
@@ -1578,6 +1753,10 @@ assert(
     sprintHandPose.firing.triggerContactDistance <= 0.02 &&
     sprintHandPose.firing.wristError <= 0.015 && sprintHandPose.support.wristError <= 0.015,
   `the sprint solve turns both arms and the rear glove with the rifle while retaining both grip contacts (${JSON.stringify(sprintHandPose ?? null)})`,
+);
+assert(
+  !handPoseProbeError && maxSprintRearElbowStep <= 0.03 && maxSprintRearArmTurnDegrees <= 8,
+  `the live Shift transition keeps the rear arm on one continuous elbow branch without a one-frame flip (max elbow step ${maxSprintRearElbowStep.toFixed(4)} m at frame ${maxSprintRearElbowStepFrame}, blend ${maxSprintRearElbowStepBlend.toFixed(4)}, from ${JSON.stringify(maxSprintRearElbowStepFrom)} to ${JSON.stringify(maxSprintRearElbowStepTo)}; max forearm turn ${maxSprintRearArmTurnDegrees.toFixed(2)} deg)`,
 );
 assert(
   !handPoseProbeError && baseHandPose?.reload.compactTravelLimit === 0.235 &&
