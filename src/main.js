@@ -85,6 +85,12 @@ let lastFrame = performance.now();
 let footsteps = 0;
 let lastAlertToast = -Infinity;
 let bootComplete = false;
+let bootPromise = null;
+let bootProgress = 0;
+let bootStatus = 'Preparing mission assets…';
+let startInProgress = false;
+let restartInProgress = false;
+let runSerial = 0;
 let fatalError = null;
 let globalHawk = null;
 let reconActive = false;
@@ -357,11 +363,19 @@ function createThermalTargets() {
     const marker = document.createElement('i');
     marker.className = 'thermal-contact-x';
     marker.dataset.contact = String(index + 1).padStart(2, '0');
+    marker.dataset.enemyId = spec.id;
     marker.hidden = true;
     layer.append(marker);
     const worldPosition = spec.position.clone();
-    worldPosition.y = Math.max(worldPosition.y + 2.15, groundAt(worldPosition.x, worldPosition.z) + 2.15);
-    return { marker, worldPosition, projected: new THREE.Vector3() };
+    worldPosition.y = Math.max(worldPosition.y + 1.18, groundAt(worldPosition.x, worldPosition.z) + 1.18);
+    return {
+      id: spec.id,
+      marker,
+      actor: null,
+      authoredPosition: spec.position.clone(),
+      worldPosition,
+      projected: new THREE.Vector3(),
+    };
   });
   const strategicLayer = document.createElement('div');
   strategicLayer.className = 'thermal-strategic-layer';
@@ -429,6 +443,58 @@ function removeThermalTargets() {
   reconThermalTargets = null;
 }
 
+function syncThermalContactPosition(contact) {
+  if (!contact) return false;
+  if (!contact.actor || contact.actor.id !== contact.id) {
+    contact.actor = enemies?.enemies?.find?.((enemy) => enemy.id === contact.id) ?? null;
+  }
+  const actor = contact.actor;
+  if (!actor?.root || actor.dead || actor.active === false) {
+    if (testMode && contact.marker) contact.marker.dataset.live = 'false';
+    return false;
+  }
+  const anchor = actor.torsoBone ?? actor.root;
+  anchor.getWorldPosition(contact.worldPosition);
+  if (anchor === actor.root) contact.worldPosition.y += 1.18;
+  if (testMode && contact.marker) {
+    const rootPosition = actor.root.getWorldPosition(new THREE.Vector3());
+    contact.marker.dataset.live = 'true';
+    contact.marker.dataset.markerAnchorError = '0.000000';
+    contact.marker.dataset.initialPlanarDrift = Math.hypot(
+      rootPosition.x - contact.authoredPosition.x,
+      rootPosition.z - contact.authoredPosition.z,
+    ).toFixed(6);
+    contact.marker.dataset.worldPosition = contact.worldPosition.toArray().map((value) => value.toFixed(4)).join(',');
+  }
+  return true;
+}
+
+function thermalAlignmentSnapshot() {
+  return reconThermalTargets?.contacts?.map((contact) => {
+    const live = syncThermalContactPosition(contact);
+    const actor = contact.actor;
+    const rootPosition = actor?.root?.getWorldPosition?.(new THREE.Vector3()) ?? null;
+    const anchor = actor?.torsoBone ?? actor?.root ?? null;
+    const anchorPosition = anchor?.getWorldPosition?.(new THREE.Vector3()) ?? null;
+    if (anchorPosition && anchor === actor?.root) anchorPosition.y += 1.18;
+    return {
+      id: contact.id,
+      live,
+      active: Boolean(actor?.active && !actor?.dead),
+      authoredPosition: contact.authoredPosition.clone(),
+      actorRootPosition: rootPosition,
+      markerWorldPosition: contact.worldPosition.clone(),
+      markerAnchorError: anchorPosition ? contact.worldPosition.distanceTo(anchorPosition) : null,
+      initialPlanarDrift: rootPosition
+        ? Math.hypot(
+          rootPosition.x - contact.authoredPosition.x,
+          rootPosition.z - contact.authoredPosition.z,
+        )
+        : null,
+    };
+  }) ?? [];
+}
+
 function projectThermalMarker(marker, worldPosition, projected, width, height) {
   projected.copy(worldPosition).project(camera);
   const visible = projected.z >= -1 && projected.z <= 1
@@ -449,6 +515,10 @@ function updateThermalTargetProjection(visibleCount) {
   const height = Math.max(1, targets.layer.clientHeight || innerHeight);
   targets.contacts.forEach((contact, index) => {
     if (index >= visibleCount) {
+      contact.marker.hidden = true;
+      return;
+    }
+    if (!syncThermalContactPosition(contact)) {
       contact.marker.hidden = true;
       return;
     }
@@ -1162,20 +1232,44 @@ function enemyCallbacks() {
   };
 }
 
+function reportBoot(progress, status) {
+  bootProgress = THREE.MathUtils.clamp(Number(progress) || 0, 0, 1);
+  bootStatus = String(status || bootStatus);
+  if (startInProgress) ui.loading(bootProgress, bootStatus);
+  else ui.preload(bootProgress, bootStatus, bootComplete);
+  document.body.dataset.bootProgress = bootProgress.toFixed(3);
+  document.body.dataset.bootReady = String(bootComplete);
+  return bootProgress;
+}
+
 async function beginGame(options = ui.getStartOptions()) {
-  if (!bootComplete || gameStarted) return;
-  difficultyProfile = getDifficultyProfile(options.difficulty);
-  difficulty = difficultyProfile.id;
-  player?.setDifficulty?.(difficultyProfile);
-  enemies?.setDifficulty?.(difficultyProfile);
-  applyQuality(options.quality ?? 'high');
-  weapon?.setMagnification?.(options.aimMagnification ?? 2);
-  const muted = Boolean(options.muted || params.get('mute') === '1');
-  audio.setMuted(muted);
-  if (!(testMode && muted)) await audio.unlock();
-  audio.ambient(true);
-  gameStarted = true;
-  ui.start({
+  if (gameStarted || startInProgress) return false;
+  startInProgress = true;
+  try {
+    const requestedOptions = { ...options };
+    difficultyProfile = getDifficultyProfile(requestedOptions.difficulty);
+    difficulty = difficultyProfile.id;
+    const muted = Boolean(requestedOptions.muted || params.get('mute') === '1');
+    audio.setMuted(muted);
+    // Begin Web Audio setup during the click gesture even when the 3D pack is
+    // still preloading. Await the same promise after boot so browsers retain
+    // permission without delaying the visible homepage.
+    const audioUnlock = testMode && muted ? Promise.resolve(false) : audio.unlock();
+    if (!bootComplete) {
+      ui.loading(bootProgress, bootStatus);
+      await bootPromise;
+    }
+    if (!bootComplete || fatalError) return false;
+    await audioUnlock;
+    player?.setDifficulty?.(difficultyProfile);
+    enemies?.setDifficulty?.(difficultyProfile);
+    applyQuality(requestedOptions.quality ?? 'high');
+    weapon?.setMagnification?.(requestedOptions.aimMagnification ?? 2);
+    audio.ambient(true);
+    gameStarted = true;
+    runSerial += 1;
+    document.body.dataset.runSerial = String(runSerial);
+    ui.start({
     health: difficultyProfile.playerHealth,
     maxHealth: difficultyProfile.playerHealth,
     armor: difficultyProfile.startingArmor,
@@ -1183,9 +1277,9 @@ async function beginGame(options = ui.getStartOptions()) {
     reserve: 120,
     aimMagnification: weapon?.aimMagnification ?? 2,
   });
-  const playRecon = testIntroMode === 'run' || RECON_TEST_TIMES[testIntroMode] != null;
+    const playRecon = testIntroMode === 'run' || RECON_TEST_TIMES[testIntroMode] != null;
 
-  if (playRecon) {
+    if (playRecon) {
     // Mission onStart deploys all authored groups synchronously. Only then is
     // the first recon frame presented, so contacts never pop into an active scan.
     startReconIntro(true);
@@ -1202,7 +1296,7 @@ async function beginGame(options = ui.getStartOptions()) {
       await reconControlPromise;
       if (reconActive) player.setEnabled(false);
     }
-  } else {
+    } else {
     reconGuardPositions = authoredEnemySpawns();
     mission.start();
     safeCall(mission, 'setExpectedHostiles', reconGuardPositions.length || 20);
@@ -1212,7 +1306,7 @@ async function beginGame(options = ui.getStartOptions()) {
     weapon.setEnabled(true);
   }
 
-  if (testMode && !playRecon) {
+    if (testMode && !playRecon) {
     player.locked = true;
     player.paused = false;
     const pose = testPoses[params.get('view')];
@@ -1312,8 +1406,12 @@ async function beginGame(options = ui.getStartOptions()) {
       mission.update(1);
       if (endingMode) endingElapsed = 12;
     }
-  } else if (!playRecon) {
-    await player.lock();
+    } else if (!playRecon) {
+      await player.lock();
+    }
+    return true;
+  } finally {
+    startInProgress = false;
   }
 }
 
@@ -1334,8 +1432,8 @@ function bindInput() {
     await player.lock();
     weapon.setEnabled(true);
   });
-  ui.onRestart(restartWithCurrentDifficulty);
-  ui.onReplay(restartWithCurrentDifficulty);
+  ui.onRestart(restartInMemory);
+  ui.onReplay(restartInMemory);
   ui.muteToggle?.addEventListener('change', () => audio.setMuted(ui.muteToggle.checked));
   ui.aimSelect?.addEventListener('change', () => {
     const aimMagnification = weapon?.setMagnification?.(ui.aimSelect.value) ?? Number(ui.aimSelect.value);
@@ -1343,10 +1441,54 @@ function bindInput() {
   });
 }
 
-function restartWithCurrentDifficulty() {
-  const restartUrl = new URL(location.href);
-  restartUrl.searchParams.set('difficulty', difficulty);
-  location.assign(restartUrl.href);
+async function restartInMemory() {
+  if (!bootComplete || restartInProgress) return false;
+  restartInProgress = true;
+  const options = {
+    quality,
+    aimMagnification: weapon?.aimMagnification ?? Number(ui.aimSelect?.value ?? 2),
+    difficulty,
+    muted: Boolean(audio.getState().muted),
+  };
+  try {
+    // Stop all run-specific presentation before resetting callbacks. The
+    // immutable world mesh, parsed character templates, textures, animations,
+    // rifle, hands, and Global Hawk stay resident and are reused immediately.
+    gameStarted = false;
+    endingMode = false;
+    endingFailure = false;
+    endingElapsed = 0;
+    endingStats = null;
+    reconActive = false;
+    cleanupReconPresentation();
+    if (globalHawk) globalHawk.visible = false;
+    reconElapsed = 0;
+    reconPhase = 'idle';
+    reconFreezePhase = null;
+    reconGuardPositions = [];
+    reconControlPromise = null;
+    reconAudioPlayed = false;
+    footsteps = 0;
+    lastAlertToast = -Infinity;
+    audio.ambient(false);
+    audio.stopVoices();
+    audio.aircraftStop(0.05);
+    player?.unlock?.();
+    player?.setEnabled?.(false);
+    player?.setPaused?.(false);
+    safeCall(world, 'resetMission');
+    safeCall(enemies, 'resetForReplay');
+    safeCall(weapon, 'resetForReplay');
+    difficultyProfile = getDifficultyProfile(difficulty);
+    player?.setDifficulty?.(difficultyProfile);
+    player?.reset?.(world?.spawn, { armor: difficultyProfile.startingArmor });
+    enemies?.setDifficulty?.(difficultyProfile);
+    mission = buildMission();
+    ui.resetForReplay();
+    return await beginGame(options);
+  } finally {
+    restartInProgress = false;
+  }
 }
 
 function showFatal(error) {
@@ -1363,10 +1505,10 @@ function showFatal(error) {
 
 async function boot() {
   try {
-    ui.loading(0.04, 'Growing the Ridgewatch landscape…');
+    reportBoot(0.04, 'Growing the Ridgewatch landscape…');
     world = await createWorld(scene, renderer);
     if (!world.scene) world.scene = scene;
-    ui.loading(0.36, 'Preparing Global Hawk reconnaissance…');
+    reportBoot(0.36, 'Preparing Global Hawk reconnaissance…');
     try {
       await loadGlobalHawk();
     } catch (error) {
@@ -1374,15 +1516,15 @@ async function boot() {
       // the local Draco worker; never replace the aircraft with fake geometry.
       console.error('[CLEARWATER] local Global Hawk load failed', error);
     }
-    ui.loading(0.45, 'Preparing human security teams…');
+    reportBoot(0.45, 'Preparing human security teams…');
 
     enemies = new EnemyDirector(scene, world, enemyCallbacks());
     await enemies.load((progress) => {
       const value = typeof progress === 'number' ? progress : progress?.progress ?? 0.5;
-      ui.loading(0.45 + Math.min(1, value) * 0.30, 'Loading skinned human characters…');
+      reportBoot(0.45 + Math.min(1, value) * 0.30, 'Loading skinned human characters…');
     });
 
-    ui.loading(0.79, 'Calibrating service carbine…');
+    reportBoot(0.79, 'Calibrating service carbine…');
     player = new PlayerController(camera, canvas, world, playerCallbacks());
     weapon = new WeaponSystem(camera, world, weaponCallbacks());
     await weapon.load();
@@ -1390,11 +1532,9 @@ async function boot() {
     player.setEnabled(false);
     mission = buildMission();
 
-    bindInput();
     bootComplete = true;
     exposeTestAPI();
-    ui.loading(1, 'Operation Clearwater ready');
-    setTimeout(() => ui.loading(false), testMode ? 10 : 520);
+    reportBoot(1, 'Operation Clearwater ready');
 
     if (params.get('autostart') === '1') {
       setTimeout(() => beginGame({
@@ -1406,18 +1546,28 @@ async function boot() {
     }
   } catch (error) {
     showFatal(error);
+    return false;
   }
+  return true;
 }
 
 function exposeTestAPI() {
   globalThis.__CLEARWATER__ = {
     ready: true,
     start: (options) => beginGame(options ?? { quality: 'low', muted: true }),
+    restart: () => restartInMemory(),
     snapshot: () => ({
       ready: bootComplete,
       started: gameStarted,
       ending: endingMode,
       endingFailure,
+      runSerial,
+      boot: {
+        progress: bootProgress,
+        status: bootStatus,
+        startInProgress,
+        restartInProgress,
+      },
       difficulty,
       quality,
       intro: {
@@ -1428,6 +1578,7 @@ function exposeTestAPI() {
         aircraftLoaded: Boolean(globalHawk),
         aircraftForwardAxis: globalHawk?.userData?.forwardAxis ?? null,
         insertion: reconSpawn.clone(),
+        thermalAlignment: thermalAlignmentSnapshot(),
       },
       camera: {
         fov: camera.fov,
@@ -1658,5 +1809,7 @@ function frame(now) {
   renderer.render(scene, camera);
 }
 
-boot();
+bindInput();
+ui.preload(0, 'Preparing mission assets…', false);
+bootPromise = boot();
 requestAnimationFrame(frame);

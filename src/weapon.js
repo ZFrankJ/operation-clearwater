@@ -813,6 +813,59 @@ export class WeaponSystem {
     };
   }
 
+  resetForReplay() {
+    this.setEnabled(false);
+    this.ammo = this.magSize;
+    this.reserve = 120;
+    this.respawnRecoveries = 0;
+    this.lastRespawnRecovery = null;
+    this.fireHeld = false;
+    this.adsHeld = false;
+    this.adsMouseHeld = false;
+    this.adsKeyHeld = false;
+    this.ads = 0;
+    this.sprintBlend = 0;
+    this.wallBlend = 0;
+    this.wallDistance = null;
+    this.reloading = false;
+    this.reloadNeedsCharge = false;
+    this.reloadTimer = 0;
+    this.shotCooldown = 0;
+    this.dryCooldown = 0;
+    this.recoil = 0;
+    this.recoilStack = 0;
+    this.muzzleTimer = 0;
+    this.boltTimer = 0;
+    this.shotSerial = 0;
+    this.lastShotOrigin.set(0, 0, 0);
+    this.time = 0;
+    this.playerState = null;
+    this.poseMode = 'hip';
+    this._poseTargetPosition.copy(this.hipPosition);
+    this._poseTargetEuler.set(0, 0, 0, 'YXZ');
+    this._poseTargetQuaternion.identity();
+    this.viewRoot.position.copy(this.hipPosition);
+    this.viewRoot.quaternion.identity();
+    this.muzzleFlash.visible = false;
+    this.muzzleLight.intensity = 0;
+    this._restoreReloadParts();
+    for (const effect of this.casings) effect.object.removeFromParent();
+    for (const effect of this.tracers) {
+      effect.object.geometry.dispose();
+      effect.object.removeFromParent();
+    }
+    for (const effect of this.impacts) {
+      effect.object.material.dispose();
+      effect.object.removeFromParent();
+    }
+    this.casings.length = 0;
+    this.tracers.length = 0;
+    this.impacts.length = 0;
+    this._setCameraFov(this.baseFov, true);
+    this._emitAmmo();
+    return this.getState();
+  }
+
   dispose() {
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);

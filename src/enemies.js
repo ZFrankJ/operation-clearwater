@@ -1158,6 +1158,53 @@ export class EnemyDirector {
     };
   }
 
+  resetForReplay() {
+    if (!this.loaded || this.disposed) return false;
+    for (const enemy of this.enemies) {
+      enemy.mixer.stopAllAction();
+      enemy.mixer.uncacheRoot(enemy.visual);
+      enemy.root.removeFromParent();
+      enemy.weaponMount?.removeFromParent?.();
+    }
+    for (const tracer of this.tracers) {
+      tracer.line.geometry.dispose();
+      tracer.line.removeFromParent();
+    }
+    // Keep parsed FBX templates, animation clips, shared materials, textures,
+    // and proxy geometries alive. Only per-run actor clones and combat state
+    // are discarded, so Replay never downloads or parses the asset pack again.
+    this.root.clear();
+    this.enemies.length = 0;
+    this.enemyById.clear();
+    this.spawnedGroups.clear();
+    this.hitProxies.length = 0;
+    this.damageMeshes.length = 0;
+    this.coverReservations.clear();
+    this.tracers.length = 0;
+    this.proxyData = new WeakMap();
+    this.damageMeshData = new WeakMap();
+    for (const site of this.operationalSites.values()) {
+      site.position = null;
+      site.facing = null;
+      site.operatorId = null;
+    }
+    this.operationCoordinationTimer = 0;
+    this.facilityAlerted = false;
+    this.facilityAlertCount = 0;
+    this.facilityAlertPosition.set(0, 0, 0);
+    this.facilityAlertReason = null;
+    this.elapsed = 0;
+    this.nextId = 1;
+    this.lastNoiseToken = 0;
+    this.playerWasFiring = false;
+    this.movementNoiseTimer = 0;
+    this.raycastSerial = 0;
+    this.lastRaycastDiagnostic = null;
+    this.lastDamageDiagnostic = null;
+    this.pendingDamageRaycast = null;
+    return true;
+  }
+
   dispose() {
     if (this.disposed) return;
     this.disposed = true;

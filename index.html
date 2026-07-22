@@ -20,7 +20,7 @@
 <body>
   <canvas id="game-canvas" aria-label="OPERATION CLEARWATER 3D game viewport"></canvas>
 
-  <div id="loading-screen" class="screen loading-screen">
+  <div id="loading-screen" class="screen loading-screen is-hidden">
     <div class="loading-mark" aria-hidden="true">
       <span></span><span></span><span></span>
     </div>
@@ -31,7 +31,7 @@
     <p class="loading-detail">Local assets · no network connection required</p>
   </div>
 
-  <main id="start-screen" class="screen start-screen is-hidden" aria-labelledby="game-title">
+  <main id="start-screen" class="screen start-screen is-visible" aria-labelledby="game-title">
     <div class="keyart" aria-hidden="true"></div>
     <div class="keyart-grade" aria-hidden="true"></div>
     <section class="briefing-panel">
@@ -55,9 +55,9 @@
       </div>
 
       <div class="deploy-row">
-        <button id="start-button" class="deploy-button" type="button">
-          <span class="button-topline">BEGIN OPERATION</span>
-          <span class="button-main">BEGIN RECON PASS</span>
+        <button id="start-button" class="deploy-button" type="button" data-ready="false" aria-busy="true">
+          <span class="button-topline">PREPARING ASSETS / 0%</span>
+          <span class="button-main">BRIEFING AVAILABLE NOW</span>
         </button>
         <div class="option-stack">
           <label>RENDER PROFILE
@@ -101,7 +101,7 @@
       <p class="start-note">Global Hawk thermal sweep precedes insertion · Click to recapture mouse · Esc pauses</p>
     </section>
     <aside class="operation-strip" aria-hidden="true">
-      <span>OPERATION CLEARWATER</span><i></i><span>THERMAL PASS: READY</span><i></i><span>STATUS: GO</span>
+      <span>OPERATION CLEARWATER</span><i></i><span>THERMAL PASS: READY</span><i></i><span id="preload-status">STATUS: PRELOADING</span>
     </aside>
   </main>
 

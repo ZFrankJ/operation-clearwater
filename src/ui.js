@@ -4,6 +4,7 @@ const ELEMENT_IDS = Object.freeze({
   loadingStatus: 'loading-status',
   startScreen: 'start-screen',
   startButton: 'start-button',
+  preloadStatus: 'preload-status',
   qualitySelect: 'quality-select',
   aimSelect: 'aim-select',
   difficultySelect: 'difficulty-select',
@@ -126,6 +127,28 @@ export class UI {
       this.el.loadingBar.setAttribute('aria-valuenow', String(Math.round(normalized * 100)));
     }
     this._text(this.el.loadingStatus, status);
+    return normalized;
+  }
+
+  preload(progress = 0, status = 'Preparing mission assets…', ready = false) {
+    const numeric = Number(progress);
+    const normalized = clamp(Number.isFinite(numeric) ? (numeric > 1 ? numeric / 100 : numeric) : 0, 0, 1);
+    const complete = Boolean(ready || normalized >= 1);
+    const percent = Math.round(normalized * 100);
+    const top = this.el.startButton?.querySelector?.('.button-topline');
+    const main = this.el.startButton?.querySelector?.('.button-main');
+    if (this.el.startButton) {
+      this.el.startButton.dataset.ready = String(complete);
+      this.el.startButton.style.setProperty('--preload', `${(normalized * 100).toFixed(1)}%`);
+      this.el.startButton.setAttribute('aria-busy', String(!complete));
+      this.el.startButton.setAttribute('aria-label', complete
+        ? 'Begin Operation Clearwater reconnaissance pass'
+        : `Prepare Operation Clearwater while assets load, ${percent} percent ready`);
+    }
+    this._text(top, complete ? 'BEGIN OPERATION' : `PREPARING ASSETS / ${percent}%`);
+    this._text(main, complete ? 'BEGIN RECON PASS' : 'BRIEFING AVAILABLE NOW');
+    this._text(this.el.preloadStatus, complete ? 'STATUS: GO' : `STATUS: PRELOADING ${percent}%`);
+    if (this.el.startScreen) this.el.startScreen.dataset.preloadStatus = status;
     return normalized;
   }
 
@@ -338,6 +361,27 @@ export class UI {
     else this._renderEndingOutcome(outcome, stats);
     this._renderEndingStats(stats);
     globalThis.setTimeout?.(() => this.el.replayButton?.focus?.(), 350);
+  }
+
+  resetForReplay() {
+    this.inGame = false;
+    this._clearTimer('subtitleTimer');
+    this._clearTimer('hitmarkerTimer');
+    this._clearTimer('damageTimer');
+    this.lastObjective = '';
+    this.setDeathVeil(0);
+    this.showThermalScan(false);
+    this.setInteract(false);
+    this.setDefenseTimer(false);
+    this.setThreatTimers(false);
+    this.showSubtitle(null, null);
+    this._show(this.el.hud, false);
+    this._show(this.el.crosshair, false);
+    this._show(this.el.pauseScreen, false);
+    this._show(this.el.endingScreen, false);
+    if (this.el.toastLayer) this.el.toastLayer.textContent = '';
+    this._setBodyState('resetting');
+    return true;
   }
 
   /**

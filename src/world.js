@@ -2291,6 +2291,9 @@ export async function createWorld(scene, renderer) {
     if (worldState.poisonNeutralized) {
       jammerBeaconMaterial.emissive.setHex(0x3ea68c);
       jammerBeaconMaterial.emissiveIntensity = 0.8;
+    } else {
+      jammerBeaconMaterial.emissive.setHex(0xf0442e);
+      jammerBeaconMaterial.emissiveIntensity = 3.2;
     }
   }
 
@@ -2337,6 +2340,38 @@ export async function createWorld(scene, renderer) {
     worldState.finished = true;
     finalBeaconMaterial.emissive.setHex(0x44dc91);
     finalBeaconMaterial.emissiveIntensity = 2.6;
+  }
+
+  function resetMission() {
+    Object.assign(worldState, {
+      elapsed: 0,
+      poisonNeutralized: false,
+      supplyValveClosed: false,
+      backdoorPipeDemolished: false,
+      poisonReleased: false,
+      jammerDisabled: false,
+      powerOn: false,
+      ledgerTransmitted: false,
+      purgeCancelled: false,
+      gateUnlocked: true,
+      finale: false,
+      finished: false,
+      gateOpen: 1,
+      operationsDoorOpen: 1,
+      valveRotation: 0,
+    });
+    poisonInteraction.enabled = true;
+    valveInteraction.enabled = true;
+    backdoorPipeInteraction.enabled = true;
+    setPoisonNeutralized(false);
+    setSupplyValveClosed(false);
+    setBackdoorPipeDemolished(false);
+    setPower(false);
+    ledgerInteraction.setCompleted(false);
+    valveWheel.rotation.z = 0;
+    finalBeaconMaterial.emissive.setHex(0xff3f25);
+    finalBeaconMaterial.emissiveIntensity = 0.25;
+    return { ...worldState };
   }
 
   function missionFlag(mission, name) {
@@ -2976,6 +3011,7 @@ export async function createWorld(scene, renderer) {
     setLedgerTransmitted,
     beginFinale,
     finishMission,
+    resetMission,
     drone,
     worldState,
   };

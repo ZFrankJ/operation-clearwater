@@ -191,6 +191,13 @@ assert(
   'home controls visibly document the C or Control crouch/crawl action',
 );
 assert(
+  /id=["']loading-screen["'][^>]*class=["'][^"']*\bis-hidden\b/.test(html) &&
+    /id=["']start-screen["'][^>]*class=["'][^"']*\bis-visible\b/.test(html) &&
+    /id=["']start-button["'][^>]*data-ready=["']false["'][^>]*aria-busy=["']true["']/.test(html) &&
+    /id=["']preload-status["']>STATUS: PRELOADING<\/span>/.test(html),
+  'the briefing homepage is visible in the initial HTML before any 3D gameplay assets finish loading',
+);
+assert(
   /id=["']health-value["']>120<\/strong>/.test(html) &&
     /id=["']armor-pips["']>(?:<i><\/i>){6}<\/b><strong id=["']armor-value["']>120<\/strong>/.test(html) &&
     /\.armor-row b\s*\{[^}]*width:\s*150px/.test(styleSource) &&
@@ -847,6 +854,14 @@ assert(
 const uiSource = await readFile(join(root, 'src/ui.js'), 'utf8');
 
 assert(
+  /preload\(progress = 0,[\s\S]*?dataset\.ready = String\(complete\)[\s\S]*?aria-busy[\s\S]*?BRIEFING AVAILABLE NOW/.test(uiSource) &&
+    /bindInput\(\);[\s\S]*?ui\.preload\(0,[\s\S]*?bootPromise = boot\(\)/.test(mainSource) &&
+    /function reportBoot\([\s\S]*?startInProgress[\s\S]*?ui\.loading[\s\S]*?ui\.preload/.test(mainSource) &&
+    /if \(!bootComplete\) \{[\s\S]*?ui\.loading\(bootProgress, bootStatus\)[\s\S]*?await bootPromise/.test(mainSource),
+  'background boot progress stays on the deploy control until an early Play click asks for the full loading overlay',
+);
+
+assert(
   /deathVeil:\s*['"]death-veil['"]/.test(uiSource) &&
     /setDeathVeil\(progress = 0\)[\s\S]*?rawClose[\s\S]*?translateY/.test(uiSource) &&
     /ui\.setDeathVeil\(playerState\?\.deathProgress \?\? 0\)/.test(mainSource) &&
@@ -923,9 +938,11 @@ assert(
 );
 assert(
   /function createThermalTargets\(\)[\s\S]*?reconGuardPositions\.map/.test(mainSource) &&
+    /function syncThermalContactPosition\(contact\)[\s\S]*?enemies\?\.enemies\?\.find\?\.[\s\S]*?actor\.torsoBone \?\? actor\.root[\s\S]*?getWorldPosition\(contact\.worldPosition\)/.test(mainSource) &&
+    /contact\.marker\.dataset\.live\s*=\s*['"]true['"][\s\S]*?dataset\.initialPlanarDrift/.test(mainSource) &&
     /function updateThermal\(time\)[\s\S]*?count:\s*detected[\s\S]*?HUMAN HEAT SIGNATURES/.test(mainSource) &&
     /count:\s*reconGuardPositions\.length[\s\S]*?HOSTILES MAPPED/.test(mainSource),
-  'thermal presentation counts the same authored hostile list it renders',
+  'thermal presentation counts the authored roster while anchoring every contact to its live enemy torso',
 );
 const thermalTargetCreationSource = mainSource.match(
   /function createThermalTargets\(\)\s*\{([\s\S]*?)\n\}\n\nfunction authoredReconTargets/,
@@ -941,8 +958,10 @@ assert(
     /reconGuardPositions\.map\(\(spec, index\)\s*=>/.test(thermalTargetCreationSource) &&
     /document\.createElement\(['"]i['"]\)[\s\S]*?marker\.className\s*=\s*['"]thermal-contact-x['"]/.test(thermalTargetCreationSource) &&
     /marker\.dataset\.contact\s*=\s*String\(index \+ 1\)\.padStart\(2, ['"]0['"]\)/.test(thermalTargetCreationSource) &&
+    /marker\.dataset\.enemyId\s*=\s*spec\.id/.test(thermalTargetCreationSource) &&
+    /authoredPosition:\s*spec\.position\.clone\(\)/.test(thermalTargetCreationSource) &&
     /overlay\.prepend\(layer, strategicLayer\)/.test(thermalTargetCreationSource),
-  'EO/IR creates exactly one separately addressable DOM X contact for every authored hostile',
+  'EO/IR creates one enemy-ID-addressable contact with an auditable authored origin for every hostile',
 );
 assert(
   /\.thermal-contact-x\s*\{[^}]*width:\s*clamp\(6px,\s*\.58vw,\s*9px\);[^}]*height:\s*clamp\(6px,\s*\.58vw,\s*9px\)/.test(styleSource) &&
@@ -958,6 +977,7 @@ assert(
     /marker\.hidden\s*=\s*!visible/.test(thermalMarkerProjectionSource) &&
     /translate3d\(\$\{x\.toFixed\(1\)\}px, \$\{y\.toFixed\(1\)\}px, 0\) translate\(-50%, -50%\)/.test(thermalMarkerProjectionSource) &&
     /if \(index\s*>=\s*visibleCount\)[\s\S]*?contact\.marker\.hidden\s*=\s*true/.test(thermalProjectionSource) &&
+    /if \(!syncThermalContactPosition\(contact\)\)[\s\S]*?contact\.marker\.hidden\s*=\s*true/.test(thermalProjectionSource) &&
     /projectThermalMarker\(contact\.marker, contact\.worldPosition, contact\.projected, width, height\)/.test(thermalProjectionSource) &&
     /targets\.strategic\.forEach[\s\S]*?projectThermalMarker\(target\.marker, target\.position, target\.projected, width, height\)/.test(thermalProjectionSource) &&
     /const detected\s*=\s*Math\.min\([\s\S]*?updateThermalTargetProjection\(detected\)/.test(mainSource),
@@ -987,8 +1007,9 @@ assert(
 assert(
   /RECON_TEST_TIMES\s*=\s*Object\.freeze\(\{\s*flyby:[\s\S]*?thermal:[\s\S]*?insertion:/.test(mainSource) &&
     /introPhase:\s*\(phase[\s\S]*?completeIntro:\s*\(\)/.test(mainSource) &&
-    /intro:\s*\{[\s\S]*?hostileCount:[\s\S]*?aircraftForwardAxis:[\s\S]*?insertion:/.test(mainSource),
-  'browser QA can freeze every recon phase and inspect count, orientation, and insertion state',
+    /intro:\s*\{[\s\S]*?hostileCount:[\s\S]*?aircraftForwardAxis:[\s\S]*?insertion:[\s\S]*?thermalAlignment:\s*thermalAlignmentSnapshot\(\)/.test(mainSource) &&
+    /function thermalAlignmentSnapshot\(\)[\s\S]*?markerAnchorError:[\s\S]*?initialPlanarDrift:/.test(mainSource),
+  'browser QA can freeze recon and audit each thermal marker against its live actor and initial authored position',
 );
 
 // Rendering stays on the native-resolution WebGL target. The former
@@ -1064,7 +1085,7 @@ assert(
 assert(
   /aimSelect:\s*['"]aim-select['"]/.test(uiSource) &&
     /aimMagnification:\s*Number\(this\.el\.aimSelect\?\.value \?\? 2\)/.test(uiSource) &&
-    /weapon\?\.setMagnification\?\.\(options\.aimMagnification \?\? 2\)/.test(mainSource) &&
+    /weapon\?\.setMagnification\?\.\(requestedOptions\.aimMagnification \?\? 2\)/.test(mainSource) &&
     /aimMagnification:\s*weapon\?\.aimMagnification \?\? 2/.test(mainSource) &&
     /Digit2:\s*2,\s*Digit4:\s*4,\s*Digit8:\s*8/.test(weaponSource) &&
     /this\.setMagnification\(directMagnification\)/.test(weaponSource) &&
@@ -1074,7 +1095,7 @@ assert(
 assert(
   /difficultySelect:\s*['"]difficulty-select['"]/.test(uiSource) &&
     /\['easy',\s*'normal',\s*'hard',\s*'extreme'\]\.includes\(selectedDifficulty\)/.test(uiSource) &&
-    /difficultyProfile\s*=\s*getDifficultyProfile\(options\.difficulty\)/.test(mainSource) &&
+    /difficultyProfile\s*=\s*getDifficultyProfile\(requestedOptions\.difficulty\)/.test(mainSource) &&
     /player\?\.setDifficulty\?\.\(difficultyProfile\)/.test(mainSource) &&
     /enemies\?\.setDifficulty\?\.\(difficultyProfile\)/.test(mainSource) &&
     /function saveCheckpoint\([\s\S]*?!isOneLifeDifficulty\(difficulty\)[\s\S]*?setCheckpoint/.test(mainSource) &&
@@ -1095,10 +1116,19 @@ assert(
 assert(
   /let difficulty\s*=\s*getDifficultyProfile\(params\.get\(['"]difficulty['"]\)\)\.id/.test(mainSource) &&
     /if \(ui\.difficultySelect\) ui\.difficultySelect\.value = difficulty/.test(mainSource) &&
-    /function restartWithCurrentDifficulty\(\)[\s\S]*?new URL\(location\.href\)[\s\S]*?searchParams\.set\(['"]difficulty['"], difficulty\)[\s\S]*?location\.assign\(restartUrl\.href\)/.test(mainSource) &&
-    /ui\.onRestart\(restartWithCurrentDifficulty\)/.test(mainSource) &&
-    /ui\.onReplay\(restartWithCurrentDifficulty\)/.test(mainSource),
-  'Restart and Play Again preserve the active difficulty while a fresh URL still defaults to Normal',
+    /async function restartInMemory\(\)[\s\S]*?difficulty,[\s\S]*?resetMission[\s\S]*?resetForReplay[\s\S]*?mission = buildMission\(\)[\s\S]*?beginGame\(options\)/.test(mainSource) &&
+    /ui\.onRestart\(restartInMemory\)/.test(mainSource) &&
+    /ui\.onReplay\(restartInMemory\)/.test(mainSource) &&
+    !/location\.(?:assign|reload|replace)\(/.test(mainSource),
+  'Restart and Play Again preserve active settings through an in-memory reset without navigating or reloading the document',
+);
+assert(
+  /resetForReplay\(\)[\s\S]*?Keep parsed FBX templates[\s\S]*?this\.enemies\.length = 0[\s\S]*?this\.spawnedGroups\.clear\(\)[\s\S]*?this\.facilityAlerted = false/.test(enemiesSource) &&
+    /resetForReplay\(\)[\s\S]*?this\.ammo = this\.magSize[\s\S]*?this\.reserve = 120[\s\S]*?this\.shotSerial = 0[\s\S]*?this\._emitAmmo\(\)/.test(weaponSource) &&
+    /function resetMission\(\)[\s\S]*?poisonNeutralized: false[\s\S]*?supplyValveClosed: false[\s\S]*?backdoorPipeDemolished: false[\s\S]*?setPoisonNeutralized\(false\)[\s\S]*?setSupplyValveClosed\(false\)[\s\S]*?setBackdoorPipeDemolished\(false\)/.test(worldSource) &&
+    /resetMission,/.test(worldSource) &&
+    /resetForReplay\(\)[\s\S]*?this\.setDeathVeil\(0\)[\s\S]*?this\._show\(this\.el\.endingScreen, false\)/.test(uiSource),
+  'replay clears every per-run combat, weapon, world, and overlay state while retaining already parsed asset templates',
 );
 const accuracyMultipliers = { easy: 1.2, normal: 0.92, hard: 0.62, extreme: 0.4 };
 const accuracyAt = (distance, multiplier, movementSpeed = 0) => {
