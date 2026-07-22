@@ -31,7 +31,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 // visually merged the rear hand with the support hand.  Moving it toward the
 // body restores a practical rear-versus-front grip separation; the analytic
 // elbow solve below drops the rear elbow while preserving this wrist seat.
-const TRIGGER_GRIP = new THREE.Vector3(0.06, -0.03, -0.073);
+const TRIGGER_GRIP = new THREE.Vector3(0.06, -0.03, -0.061);
 const SUPPORT_GRIP = new THREE.Vector3(-0.048, -0.015, -0.205);
 // Measured from the normalized CC0 M4's Trigger mesh (centre y=.0041,
 // z=-.1363). Both index joints converge on this point, placing the modeled

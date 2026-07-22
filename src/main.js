@@ -981,6 +981,7 @@ function beginEnding(stats, outcome = {}) {
   weapon?.setEnabled?.(false);
   player?.setEnabled?.(false);
   safeCall(world, 'finishMission');
+  audio.stopVoices();
   audio.ending();
   player?.unlock?.();
   ui.setInteract(false);
@@ -1019,6 +1020,7 @@ function beginHardFailure(reason = 'operator_down') {
   player?.setEnabled?.(false);
   player?.unlock?.();
   audio.ambient(false);
+  audio.stopVoices();
   audio.failure();
   ui.setInteract(false);
   ui.setDefenseTimer(false);

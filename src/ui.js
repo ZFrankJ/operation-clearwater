@@ -113,7 +113,11 @@ export class UI {
     const numeric = Number(progress);
     const normalized = clamp(Number.isFinite(numeric) ? (numeric > 1 ? numeric / 100 : numeric) : 0, 0, 1);
     this._show(this.el.loadingScreen, visible);
-    if (!visible && !this.inGame) this._show(this.el.startScreen, true);
+    if (!visible && !this.inGame) {
+      this._show(this.el.startScreen, true);
+      const briefingPanel = this.el.startScreen?.querySelector?.('.briefing-panel');
+      if (briefingPanel) briefingPanel.scrollTop = 0;
+    }
     if (this.el.loadingBar) {
       this.el.loadingBar.style.width = `${(normalized * 100).toFixed(1)}%`;
       this.el.loadingBar.style.setProperty('--progress', String(normalized));

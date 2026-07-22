@@ -66,7 +66,7 @@ appropriate distribution channel for its offline edition.
 - `R` — reload
 - `E` — hold to interact
 - `Shift` — sprint / lower weapon
-- `C` or `Ctrl` — crouch
+- `C` or `Ctrl` — crouch / crawl
 - `Space` — jump / short vault
 - `Esc` — pause and release mouse
 

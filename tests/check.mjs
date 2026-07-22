@@ -186,6 +186,10 @@ assert(
   'home controls retain selectable 2x, 4x, and 8x magnification and advertise direct in-game switching',
 );
 assert(
+  /<kbd>C \/ CTRL<\/kbd><span>CROUCH \/ CRAWL<\/span>/.test(html),
+  'home controls visibly document the C or Control crouch/crawl action',
+);
+assert(
   !/operator-dossier|operator-portrait|VCS-4 SERVICE CARBINE/.test(html) &&
     /id=["']difficulty-select["'][\s\S]*?value=["']easy["'][\s\S]*?value=["']normal["'][\s\S]*?value=["']hard["'][\s\S]*?value=["']extreme["']/.test(html) &&
     /EASY\s*\/\s*FORGIVING[\s\S]*?value=["']normal["'] selected[\s\S]*?EXTREME\s*\/\s*CONCEALED VESTS/.test(html),
@@ -819,6 +823,12 @@ assert(
   'player death triggers a loud vocal-like fall, impact, heartbeat, and ringing tail before the eyelid close completes',
 );
 assert(
+  /stopVoices\(\)\s*\{[\s\S]*?speechSynthesis\?\.cancel\?\.\(\)[\s\S]*?this\.activeVoices\.clear\(\)/.test(audioSource) &&
+    /beginHardFailure[\s\S]*?audio\.stopVoices\(\)[\s\S]*?audio\.failure\(\)/.test(mainSource) &&
+    /beginEnding[\s\S]*?audio\.stopVoices\(\)[\s\S]*?audio\.ending\(\)/.test(mainSource),
+  'terminal success or failure cancels any active officer speech before the ending sound plays',
+);
+assert(
   /this\.lowHealthThreshold\s*=\s*0\.35/.test(playerSource) &&
     /this\.minimumMobility\s*=\s*0\.58/.test(playerSource) &&
     /maxSpeed[\s\S]*?this\._mobilityMultiplier\(\)/.test(playerSource) &&
@@ -861,6 +871,17 @@ assert(
   !/\.operator-dossier\s*\{|\.operator-portrait\s*\{|\.loadout-card\s*\{|\.optic-row\s*\{/.test(styleSource) &&
     /\.option-stack\s*\{[^}]*grid-template-columns:\s*repeat\(2/.test(styleSource),
   'the home layout removes the operator card and keeps compact two-column deployment options',
+);
+assert(
+  /\.briefing-panel\s*\{[^}]*height:\s*100%[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/.test(styleSource) &&
+    /@media \(max-width: 900px\)[\s\S]*?\.briefing-panel\s*\{[^}]*width:\s*min\(720px, 84vw\)[^}]*justify-content:\s*flex-start/.test(styleSource) &&
+    /@media \(max-width: 700px\)[\s\S]*?\.briefing-panel\s*\{[^}]*width:\s*100%/.test(styleSource) &&
+    /@media \(max-width: 480px\)[\s\S]*?\.option-stack\s*\{[^}]*grid-template-columns:\s*1fr/.test(styleSource) &&
+    /@media \(max-width: 900px\)[\s\S]*?\.operation-strip\s*\{[^}]*display:\s*none/.test(styleSource) &&
+    /briefingPanel\.scrollTop\s*=\s*0/.test(uiSource) &&
+    !/\.brief-plans\s*\{\s*display:\s*none/.test(styleSource) &&
+    !/\.brief-meta span:nth-child\(3\)\s*\{\s*display:\s*none/.test(styleSource),
+  'the home briefing scrolls safely, preserves its small-print content, and stacks settings before text can clip',
 );
 
 // Recon is a local, deterministic cinematic: all 20 initial contacts exist
@@ -1296,7 +1317,7 @@ const vectorNear = (actual, expected, epsilon = 0.001) => Boolean(actual) &&
   actual.every((value, index) => Math.abs(value - expected[index]) <= epsilon);
 assert(
   Boolean(triggerWrist && supportWrist) &&
-    vectorNear(triggerWrist, [0.06, -0.03, -0.073]) && vectorNear(supportWrist, [-0.048, -0.015, -0.205]) &&
+    vectorNear(triggerWrist, [0.06, -0.03, -0.061]) && vectorNear(supportWrist, [-0.048, -0.015, -0.205]) &&
     triggerWrist[1] <= supportWrist[1] + 0.01 && supportWrist[2] <= triggerWrist[2] - 0.1 &&
     Math.hypot(...triggerWrist.map((value, index) => value - supportWrist[index])) > 0.15,
   'the firing wrist sits on the requested lower arm line while the support wrist remains forward on the handguard',

@@ -452,12 +452,19 @@ export class AudioSystem {
     return this.success();
   }
 
+  stopVoices() {
+    try {
+      globalThis.speechSynthesis?.cancel?.();
+    } catch {
+      // Browsers may tear down their speech service while a page is closing.
+    }
+    this.activeVoices.clear();
+    return true;
+  }
+
   setMuted(muted = true) {
     this.muted = Boolean(muted);
-    if (this.muted) {
-      globalThis.speechSynthesis?.cancel?.();
-      this.activeVoices.clear();
-    }
+    if (this.muted) this.stopVoices();
     if (this.ctx && this.master) {
       const now = this.ctx.currentTime;
       this.master.gain.cancelScheduledValues(now);

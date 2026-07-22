@@ -102,11 +102,15 @@ button { cursor: pointer; }
   z-index: 2;
   position: relative;
   width: min(850px, 66vw);
-  min-height: 100%;
+  height: 100%;
   padding: clamp(42px, 7vh, 84px) clamp(36px, 5vw, 86px) 28px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(101,217,230,.34) transparent;
   background-image: linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
   background-size: 64px 100%;
 }
@@ -351,24 +355,34 @@ noscript { position: fixed; inset: 0; z-index: 1000; display: grid; place-items:
 }
 
 @media (max-width: 900px), (max-height: 700px) {
-  .briefing-panel { width: min(620px, 66vw); padding-top: 26px; padding-bottom: 20px; }
+  .briefing-panel { padding-top: 26px; padding-bottom: 20px; }
   .title-lockup h1 { font-size: clamp(54px, 9vw, 86px); }
   .mission-brief { margin-top: 22px; padding: 12px 0; }
   .control-grid { margin-top: 16px; }
-  .start-note { display: none; }
   .ending-card { width: 72vw; }
 }
 
-@media (max-width: 620px) {
+@media (max-width: 900px) {
+  .briefing-panel { width: min(720px, 84vw); justify-content: flex-start; }
+  .deploy-row { display: grid; grid-template-columns: minmax(210px, .9fr) minmax(270px, 1.1fr); }
+  .deploy-button, .option-stack { min-width: 0; }
+  .control-grid { grid-template-columns: repeat(5, minmax(62px, 1fr)); }
+  .operation-strip { display: none; }
+}
+
+@media (max-height: 700px) and (min-width: 901px) {
+  .briefing-panel { width: min(780px, 72vw); }
+  .deploy-button, .option-stack { min-width: 0; }
+}
+
+@media (max-width: 700px) {
   .briefing-panel { width: 100%; padding: 36px 28px 24px 38px; background: rgba(3,13,18,.78); }
   .briefing-panel::before { left: 18px; }
   .keyart-grade { background: rgba(3,12,17,.64); }
   .mission-brief p { font-size: 11px; }
-  .brief-plans { display: none; }
-  .brief-meta span:nth-child(3) { display: none; }
   .deploy-row { display: block; }
   .deploy-button { min-width: 100%; }
-  .option-stack { margin-top: 10px; grid-template-columns: 1fr 1fr; }
+  .option-stack { width: 100%; margin-top: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .control-grid { grid-template-columns: repeat(3, 1fr); }
   .objective-card { width: 72vw; }
   .compass, .threat-card { display: none; }
@@ -382,6 +396,10 @@ noscript { position: fixed; inset: 0; z-index: 1000; display: grid; place-items:
   .thermal-footer { left: 22px; right: 22px; }
   .thermal-footer > span { display: none; }
   .thermal-track { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .option-stack { grid-template-columns: 1fr; gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
