@@ -367,10 +367,10 @@ assert(
 assert(!/NORTH_(?:ARRIVAL_)?GATE['"][\s\S]{0,100}?blocking:\s*true/.test(worldSource),
   'the authored infiltration opening is not closed by a hidden blocking gate');
 assert(
-  /RESERVOIR_PARAPET_BARRIER/.test(worldSource) &&
-    /fenceSegment\(['"]RESERVOIR_SAFETY_FENCE['"]/.test(worldSource) &&
+  !/RESERVOIR_CONCRETE_PARAPET|RESERVOIR_PARAPET_BARRIER/.test(worldSource) &&
+    /fenceSegment\(['"]RESERVOIR_SAFETY_FENCE['"],\s*-30,\s*-112,\s*30,\s*-112,\s*0,\s*2\.5/.test(worldSource) &&
     /kind:\s*['"]reservoir_barrier['"]/.test(worldSource),
-  'reservoir edge has continuous visible and actor-solid safety barriers',
+  'the rear reservoir edge uses a ground-level actor-solid wire barrier without an overhanging masonry parapet',
 );
 const fencePoint = (match, offset) => match ? [Number(match[offset]), Number(match[offset + 1])] : null;
 const sameFencePoint = (left, right) => Boolean(left && right && left[0] === right[0] && left[1] === right[1]);
@@ -626,8 +626,10 @@ const grassPoints = [...grassSection.matchAll(/\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\
 const exteriorGrass = grassPoints.filter(([x, z]) => z >= 60 || Math.abs(x) >= 30);
 const maintainedInteriorGrass = grassPoints.filter(([x, z]) => z < 60 && z > -112 && Math.abs(x) < 30);
 assert(
-  grassPoints.length === 48 && exteriorGrass.length === grassPoints.length && maintainedInteriorGrass.length === 0,
-  'all 48 individually modeled grass accents remain in the unmanaged exterior with none on the maintained apron',
+  grassPoints.length === 48 && exteriorGrass.length === grassPoints.length && maintainedInteriorGrass.length === 0 &&
+    /const isMaintainedServiceSurface\s*=\s*\(x, z, clearance = 0\.75\)\s*=>\s*serviceSurfaces\.some/.test(worldSource) &&
+    /const maintainedGrassPlacements\s*=\s*grassPlacements\.filter\(\(\[x, z\]\)\s*=>\s*!isMaintainedServiceSurface\(x, z, 1\.2\)\)/.test(worldSource),
+  'all modeled grass candidates remain exterior and authored clumps are excluded from every maintained service surface',
 );
 const exteriorGrassFieldSource = worldSource.match(
   /function buildExteriorGrassField\(\)\s*\{([\s\S]*?)\n\s*\}\n\n\s*const pinePlacements/,
@@ -636,9 +638,10 @@ const grassZoneTargets = [...exteriorGrassFieldSource.matchAll(/targetCount:\s*(
 assert(
   grassZoneTargets.length === 3 && grassZoneTargets.reduce((sum, count) => sum + count, 0) === 6300 &&
     /new THREE\.InstancedMesh\([\s\S]*?AUTHORED_EXTERIOR_GRASS_FIELD_/.test(exteriorGrassFieldSource) &&
+    /if \(isMaintainedServiceSurface\(x, z\)\) return;/.test(exteriorGrassFieldSource) &&
     /authoredBounds\s*=\s*Object\.freeze\(\{\s*minX:\s*-82\.5,\s*maxX:\s*82\.5,\s*minZ:\s*-108\.5,\s*maxZ:\s*133/.test(exteriorGrassFieldSource) &&
     /maintainedInteriorFieldClumps:\s*0/.test(worldSource),
-  'the 6,300-clump exterior field stays on supported land with broad margins and a strictly empty maintained interior',
+  'the exterior grass field stays on supported land and rejects every measured road, pad, approach, and maintained interior surface',
 );
 assert(
   /const hashUnit\s*=/.test(exteriorGrassFieldSource) &&
@@ -2604,8 +2607,8 @@ const selectedCorpseClearance = corpseDirector._fallenBodyClearance(
 corpseDirector._updateDeath(corpseEnemy, 2);
 assert(
   corpseEnemy.death.collisionFree && selectedCorpseClearance.clear &&
-    corpseEnemy.root.position.distanceTo(corpseEnemy.death.targetPosition.clone().add(new THREE.Vector3(0, 0.045, 0))) <= 0.001,
-  'a guard downed beside a wall selects and settles into a full collision-free body footprint instead of rotating through the wall',
+    corpseEnemy.root.position.distanceTo(corpseEnemy.death.targetPosition.clone().add(new THREE.Vector3(0, 0.16, 0))) <= 0.001,
+  'a guard downed beside a wall selects a collision-free footprint and retains prone-body clearance above its supporting surface',
 );
 corpseDirector.dispose();
 
@@ -2667,7 +2670,10 @@ const rejectingWorldLoaderUrl = (name) => `data:text/javascript,${encodeURICompo
   `export class ${name}{loadAsync(){return Promise.reject(new Error('stubbed ${name}'))}}`,
 )}`;
 const topologyTextureLoaderUrl = `data:text/javascript,${encodeURIComponent(
-  'export class TextureLoader{async loadAsync(){return {repeat:{set(){}},offset:{set(){}},center:{set(){}},dispose(){}}}}',
+  `let serial=0;
+   const axis=()=>({x:1,y:1,set(x,y){this.x=x;this.y=y;}});
+   const texture=()=>({uuid:'stub-texture-'+(++serial),repeat:axis(),offset:axis(),center:axis(),clone(){return texture();},dispose(){}});
+   export class TextureLoader{async loadAsync(){return texture();}}`,
 )}`;
 const topologyCanvasContext = new Proxy({}, {
   get(target, key) {
@@ -2717,6 +2723,7 @@ try {
 }
 
 const pipeNetwork = runtimeWorld?.pipeNetwork;
+const serviceSurfaceNetwork = runtimeWorld?.serviceSurfaceNetwork;
 const pipeContract = runtimeWorldModule?.PIPE_NETWORK_CONTRACT;
 const pipeNodes = new Map((pipeNetwork?.nodes ?? []).map((node) => [node.id, node]));
 const pipeRuns = new Map((pipeNetwork?.runs ?? []).map((run) => [run.id, run]));
@@ -2778,15 +2785,23 @@ const pipeRunEndpointAudit = (pipeNetwork?.runs ?? []).every((run) => {
 const groundedRackSupportAudit = (pipeNetwork?.supports ?? [])
   .filter((support) => support.kind === 'rack')
   .every((support) => {
-    const foot = runtimeWorld?.scene.getObjectByName(`${support.id}_FOOT`);
-    if (!foot) return false;
-    const groundY = runtimeWorld.getGroundHeight(
-      support.position[0],
-      support.position[2],
-      support.position[1],
-    );
-    return Math.abs((foot.position.y - 0.05) - groundY) <= 0.015;
+    if (support.footPositions.length !== 2) return false;
+    return ['A', 'B'].every((suffix, index) => {
+      const foot = runtimeWorld?.scene.getObjectByName(`${support.id}_FOOT_${suffix}`);
+      const authored = support.footPositions[index];
+      if (!foot || !finitePoint(authored)) return false;
+      const groundY = runtimeWorld.getGroundHeight(authored[0], authored[2], support.position[1]);
+      return Math.abs(foot.position.x - authored[0]) <= 0.001 &&
+        Math.abs(foot.position.z - authored[2]) <= 0.001 &&
+        Math.abs((foot.position.y - 0.05) - groundY) <= 0.015;
+    });
   });
+const physicallySeatedSupportAudit = (pipeNetwork?.supports ?? []).every((support) => (
+  Math.abs(support.cradleContactGap) <= 0.001 &&
+  (support.kind !== 'rack' || support.footPositions.length === 2) &&
+  (support.kind !== 'floor' || support.footPositions.length === 1) &&
+  (support.kind !== 'hanger' || support.anchorPositions.length === 2)
+));
 const continuousRackRailAudit = (pipeNetwork?.runs ?? [])
   .filter((run) => run.supportKind === 'rack' && run.supportIds.length > 1)
   .every((run) => Array.from({ length: run.supportIds.length - 1 }, (_, offset) => offset + 1)
@@ -2835,6 +2850,38 @@ const independentlyDanglingPipeNodes = [...pipeNodes.values()].filter((node) => 
   (computedPipeDegrees.get(node.id) ?? 0) < 2 &&
   !legitimatePipeTerminalKinds.has(node.kind) && !equipmentTerminalNodeIds.has(node.id)
 ));
+const serviceSurfaceTextureAudit = (serviceSurfaceNetwork?.surfaces ?? []).every((surface) => {
+  const mesh = runtimeWorld?.scene.getObjectByName(surface.id);
+  const width = surface.maxX - surface.minX;
+  const depth = surface.maxZ - surface.minZ;
+  return Boolean(
+    mesh?.userData?.routeSurface && mesh.material?.map && surface.textureTileMeters > 0 &&
+    Math.abs(mesh.material.map.repeat.x - width / surface.textureTileMeters) <= 0.001 &&
+    Math.abs(mesh.material.map.repeat.y - depth / surface.textureTileMeters) <= 0.001
+  );
+});
+const serviceSurfaceTextureIds = new Set((serviceSurfaceNetwork?.surfaces ?? [])
+  .map((surface) => runtimeWorld?.scene.getObjectByName(surface.id)?.material?.map?.uuid)
+  .filter(Boolean));
+const gateDoglegSurface = serviceSurfaceNetwork?.surfaces?.find((surface) => surface.id === 'EXTERIOR_GATE_DOGLEG');
+const gateThroatSurface = serviceSurfaceNetwork?.surfaces?.find((surface) => surface.id === 'NORTH_GATE_ENTRY_THROAT');
+const roadClearsNorthFence = Boolean(
+  gateDoglegSurface?.minZ >= 60 &&
+  gateThroatSurface?.minX >= -22.5 && gateThroatSurface?.maxX <= -12.5 &&
+  gateThroatSurface?.minZ >= 55 && gateThroatSurface?.maxZ <= 60
+);
+assert(
+  serviceSurfaceNetwork?.surfaces?.length === 13 && roadClearsNorthFence &&
+    serviceSurfaceNetwork.allSurfacesConnected && serviceSurfaceNetwork.noCoplanarOverlaps &&
+    serviceSurfaceNetwork.overlapPairs.length === 0 &&
+    serviceSurfaceNetwork.disconnectedSurfaceIds.length === 0 &&
+    serviceSurfaceTextureAudit && serviceSurfaceTextureIds.size === serviceSurfaceNetwork.surfaces.length &&
+    ['EXTERIOR_INFILTRATION_TRACK', 'EXTERIOR_GATE_DOGLEG', 'NORTH_GATE_ENTRY_THROAT', 'COMPOUND_MAINTENANCE_APRON',
+      'TREATMENT_HALL_SERVICE_LINK', 'WEST_APRON_SERVICE_LINK', 'CROSS_YARD_SERVICE_LANE',
+      'VALVE_HOUSE_CONCRETE_APPROACH', 'VALVE_BACKDOOR_SERVICE_PAD']
+      .every((id) => serviceSurfaceNetwork.surfaces.some((surface) => surface.id === id)),
+  'all roads, approaches, foundations, and pads form one non-overlapping network, clear the north fence outside its gate, and use world-scaled independent texture transforms',
+);
 assert(
   !runtimeWorldError && pipeNetwork && pipeContract &&
     runtimeWorld.metadata.pipeNetwork === pipeNetwork && pipeNetwork.contract === pipeContract &&
@@ -2850,11 +2897,12 @@ assert(
 );
 assert(
   pipeRunEndpointAudit && independentlyDanglingPipeNodes.length === 0 &&
-    groundedRackSupportAudit && continuousRackRailAudit && connectedCeilingHangerAudit &&
+    groundedRackSupportAudit && physicallySeatedSupportAudit &&
+    continuousRackRailAudit && connectedCeilingHangerAudit &&
     [...pipeNodes.values()].every((node) => node.degree === computedPipeDegrees.get(node.id)) &&
     [...pipeSupports.values()].every((support) => pipeRuns.has(support.runId)) &&
     [...pipeFittings.values()].every((fitting) => pipeNodes.has(fitting.nodeId)),
-  'every measured run terminates at its junction, floor racks are grounded, ceiling hangers touch the roof structure, and no node dangles',
+  'every run terminates, each rack post owns a grounded footing, cradles touch their pipes, ceiling anchors touch structure, and no node dangles',
 );
 const penetrationAudit = (pipeNetwork?.wallPenetrations ?? []).every((penetration) => (
   pipeContract?.wallPenetrationIds?.includes(penetration.id) && pipeNodes.has(penetration.nodeId) &&
@@ -2887,6 +2935,7 @@ const expectedHydraulicFlowPath = [
 const pipeInvariantKeys = [
   'allRunEndpointsTerminated',
   'allExposedHorizontalRunsSupported',
+  'allSupportsPhysicallySeated',
   'noCoincidentRuns',
   'allWallPenetrationsCollared',
   'pumpDischargePrecedesPoisonInjection',
@@ -2900,6 +2949,7 @@ assert(
     pipeInvariantKeys.every((key) => pipeNetwork.connectivity[key] === true) &&
     pipeNetwork.connectivity.danglingNodeIds.length === 0 &&
     pipeNetwork.connectivity.unsupportedHorizontalRunIds.length === 0 &&
+    pipeNetwork.connectivity.misseatedSupportIds.length === 0 &&
     pipeNetwork.connectivity.coincidentRunPairs.length === 0,
   'the named hydraulic contract is tank to pump to header to injection to valve to backdoor, with every measured invariant true',
 );
@@ -3151,7 +3201,9 @@ assert(
   'engaged guards turn their bodies and visually track the player with the mounted rifle',
 );
 assert(
-  /_chooseDeathPose\(enemy\)[\s\S]*?_fallenBodyClearance\(targetPosition, direction\)/.test(enemiesSource) &&
+  /_fallenBodySurfaceHeight\(rootPosition, direction\)[\s\S]*?FALLEN_BODY_LENGTH/.test(enemiesSource) &&
+    /_chooseDeathPose\(enemy\)[\s\S]*?_fallenBodyClearance\(supportedPosition, direction\)/.test(enemiesSource) &&
+    /settleHeight:\s*FALLEN_BODY_SURFACE_CLEARANCE/.test(enemiesSource) &&
     /makeBasis\(xAxis, direction, UP\)/.test(enemiesSource) &&
     /targetQuaternion:\s*deathPose\.targetQuaternion/.test(enemiesSource) &&
     /weaponMount\.removeFromParent\(\)[\s\S]*?targetPosition:[\s\S]*?weaponDrop/.test(enemiesSource) &&

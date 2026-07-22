@@ -37,7 +37,7 @@ const TERRAIN_MAX_Z = 164;
 // Static contract for build-time QA. Runtime createWorld() exposes the same
 // contract alongside the fully measured graph in world.pipeNetwork.
 export const PIPE_NETWORK_CONTRACT = Object.freeze({
-  revision: 'clearwater-connected-waterworks-v1',
+  revision: 'clearwater-connected-waterworks-v2',
   graphKind: 'directed_hydraulic_network',
   sourceNodeIds: Object.freeze([
     'PROCESS_TANK_A_OUTLET',
@@ -85,6 +85,7 @@ export const PIPE_NETWORK_CONTRACT = Object.freeze({
   invariants: Object.freeze({
     allRunEndpointsTerminated: true,
     allExposedHorizontalRunsSupported: true,
+    allSupportsPhysicallySeated: true,
     noCoincidentRuns: true,
     pumpDischargePrecedesPoisonInjection: true,
     poisonFeedsSingleInjectionPort: true,
@@ -328,6 +329,7 @@ export async function createWorld(scene, renderer) {
   const pipeSupports = [];
   const pipeWallPenetrations = [];
   const pipeEquipmentLinks = [];
+  const serviceSurfaces = [];
   const tmpRay = new THREE.Ray();
   const tmpDirection = new THREE.Vector3();
   const tmpHit = new THREE.Vector3();
@@ -590,6 +592,9 @@ export async function createWorld(scene, renderer) {
     const cross = new THREE.Vector3(-axis.z, 0, axis.x).normalize();
     const id = `${run.id}_${kind.toUpperCase()}_${index + 1}`;
     const clampId = `${id}_CLAMP`;
+    const footPositions = [];
+    const anchorPositions = [];
+    let cradleContactGap = 0;
     if (kind === 'hanger') {
       const half = radius + 0.11;
       // The treatment hall roof soffit is y=4.22. A transverse Unistrut-style
@@ -622,6 +627,7 @@ export async function createWorld(scene, renderer) {
           materials.galvanized,
           { castShadow: true },
         );
+        anchorPositions.push(new THREE.Vector3(position.x + offset.x, 4.205, position.z + offset.z));
         beamBetween(
           `${id}_ROD_${side < 0 ? 'A' : 'B'}`,
           [position.x + offset.x, anchorY, position.z + offset.z],
@@ -642,11 +648,33 @@ export async function createWorld(scene, renderer) {
       const surfaceY = getGroundHeight(position.x, position.z, position.y)
         ?? terrainHeight(position.x, position.z);
       const footTopY = surfaceY + 0.1;
-      const cradleY = position.y - radius - 0.055;
+      // The 40 mm cradle now touches the pipe underside exactly. The former
+      // 55 mm offset left a visible 15 mm air gap below every outdoor run.
+      const cradleY = position.y - radius - 0.04;
       const postTop = Math.max(footTopY + 0.02, cradleY);
       const sides = kind === 'rack' ? [-1, 1] : [0];
       sides.forEach((side) => {
         const offset = cross.clone().multiplyScalar(half * side);
+        const suffix = kind === 'rack' ? `_${side < 0 ? 'A' : 'B'}` : '';
+        const footPosition = new THREE.Vector3(
+          position.x + offset.x,
+          surfaceY + 0.05,
+          position.z + offset.z,
+        );
+        footPositions.push(footPosition.clone());
+        // Each rack post owns a footing directly beneath its centreline. A
+        // single brick between two posts looked detached from both supports.
+        boxMesh(
+          `${id}_FOOT${suffix}`,
+          footPosition.x,
+          footPosition.y,
+          footPosition.z,
+          0.42,
+          0.1,
+          0.42,
+          materials.darkConcrete,
+          { castShadow: true },
+        );
         beamBetween(
           `${id}_POST_${side < 0 ? 'A' : side > 0 ? 'B' : 'C'}`,
           [position.x + offset.x, footTopY, position.z + offset.z],
@@ -662,10 +690,17 @@ export async function createWorld(scene, renderer) {
         0.04,
         materials.galvanized,
       );
-      boxMesh(`${id}_FOOT`, position.x, surfaceY + 0.05, position.z, 0.42, 0.1, 0.42, materials.darkConcrete, { castShadow: true });
     }
     pipeRing(clampId, position, axis, radius * 1.08, Math.max(0.018, radius * 0.09), materials.galvanized);
-    const support = { id, kind, runId: run.id, position };
+    const support = {
+      id,
+      kind,
+      runId: run.id,
+      position,
+      footPositions,
+      anchorPositions,
+      cradleContactGap,
+    };
     pipeSupports.push(support);
     run.supportIds.push(id);
     return support;
@@ -698,7 +733,15 @@ export async function createWorld(scene, renderer) {
     if (horizontal) {
       const supportKind = run.supportKind;
       if (supportKind === 'embedded' || supportKind === 'equipment') {
-        const support = { id: `${name}_${supportKind.toUpperCase()}`, kind: supportKind, runId: name, position: start.clone().add(end).multiplyScalar(0.5) };
+        const support = {
+          id: `${name}_${supportKind.toUpperCase()}`,
+          kind: supportKind,
+          runId: name,
+          position: start.clone().add(end).multiplyScalar(0.5),
+          footPositions: [],
+          anchorPositions: [],
+          cradleContactGap: 0,
+        };
         pipeSupports.push(support);
         run.supportIds.push(support.id);
       } else {
@@ -737,12 +780,45 @@ export async function createWorld(scene, renderer) {
     return mesh;
   };
 
-  function slab(name, x, z, width, depth, top = 0.09, material = materials.concrete) {
+  function slab(name, x, z, width, depth, top = 0.09, material = materials.concrete, options = {}) {
     const thickness = 0.28;
-    const result = boxMesh(name, x, top - thickness * 0.5, z, width, thickness, depth, material, {
+    const tileMeters = material === materials.gravel ? 1.35 : 1.8;
+    const surfaceMaterial = material.clone();
+    surfaceMaterial.name = `${material.name} / ${name}`;
+    const phase = (value) => ((value % 1) + 1) % 1;
+    for (const textureKey of ['map', 'normalMap', 'roughnessMap', 'aoMap']) {
+      const sourceTexture = material[textureKey];
+      if (!sourceTexture) continue;
+      const texture = sourceTexture.clone();
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(width / tileMeters, depth / tileMeters);
+      texture.offset.set(
+        phase((x - width * 0.5) / tileMeters),
+        phase((z - depth * 0.5) / tileMeters),
+      );
+      texture.needsUpdate = true;
+      surfaceMaterial[textureKey] = texture;
+    }
+    const result = boxMesh(name, x, top - thickness * 0.5, z, width, thickness, depth, surfaceMaterial, {
       collider: true, kind: 'floor', raycast: true, surface: material.name,
     });
     addFloor(`${name}_FLOOR`, x, z, width, depth, top, { box: result.collider.box });
+    if (options.routeSurface) {
+      result.mesh.userData.routeSurface = true;
+      result.mesh.userData.routeKind = options.routeKind ?? 'service_surface';
+      result.mesh.userData.textureTileMeters = tileMeters;
+      serviceSurfaces.push({
+        id: name,
+        kind: options.routeKind ?? 'service_surface',
+        minX: x - width * 0.5,
+        maxX: x + width * 0.5,
+        minZ: z - depth * 0.5,
+        maxZ: z + depth * 0.5,
+        top,
+        textureTileMeters: tileMeters,
+      });
+    }
     return result;
   }
 
@@ -1077,26 +1153,32 @@ export async function createWorld(scene, renderer) {
   reservoir.position.set(0, -3.55, -147);
   reservoir.receiveShadow = true;
   root.add(reservoir);
-  boxMesh('RESERVOIR_CONCRETE_PARAPET', 0, 0.52, -112, 64.4, 1.2, 0.85, materials.darkConcrete, { collider: true, colliderId: 'RESERVOIR_PARAPET_BARRIER', kind: 'reservoir_barrier', raycast: true });
-  // The elevated safety mesh terminates into the west/east perimeter posts.
-  // Its old +/-32 m endpoints overhung those corners by two metres and placed
-  // near-coincident hardware across the parapet, reading as broken geometry.
-  fenceSegment('RESERVOIR_SAFETY_FENCE', -30, -112, 30, -112, 1.1, 1.25, {
+  // Chain-link now reaches the ground and owns the entire rear barrier. The
+  // former masonry parapet extended beyond both perimeter corners and read as
+  // an unrelated brick wall behind the factory.
+  fenceSegment('RESERVOIR_SAFETY_FENCE', -30, -112, 30, -112, 0, 2.5, {
     kind: 'reservoir_barrier', ballistic: false, startPost: false, endPost: false,
   });
 
-  // The approach is a staggered maintenance route rather than a sightline from
-  // spawn through gate and both objective doors. Mud separates the compacted
-  // strips, making the two ninety-degree route changes readable from ground
-  // level while the continuous terrain remains the collision floor.
-  slab('EXTERIOR_INFILTRATION_TRACK', -34, 80, 5.2, 34, 0.045, materials.gravel);
-  slab('EXTERIOR_GATE_DOGLEG', -26, 63.5, 21, 5.2, 0.05, materials.gravel);
-  slab('COMPOUND_MAINTENANCE_APRON', -10, 44, 36, 22, 0.07, materials.gravel);
-  slab('TREATMENT_HALL_CONCRETE_APPROACH', 5.5, 14, 8.2, 10, 0.085, materials.concrete);
-  slab('WEST_PROCESS_SERVICE_LANE', -25, -10, 7.5, 56, 0.065, materials.gravel);
-  slab('CROSS_YARD_SERVICE_LANE', -5, -43, 48, 7.5, 0.065, materials.gravel);
-  slab('VALVE_HOUSE_CONCRETE_APPROACH', 18, -48, 8.5, 10, 0.085, materials.concrete);
-  slab('VALVE_BACKDOOR_SERVICE_PAD', 3, -86, 12, 10, 0.075, materials.concrete);
+  // The staggered route now forms one edge-joined service network. Every turn
+  // ends exactly at the next slab boundary: no muddy gap interrupts a road and
+  // no coplanar overlap can flicker as two textured tops fight for depth.
+  const GRAVEL_ROUTE_TOP = 0.07;
+  const CONCRETE_ROUTE_TOP = 0.09;
+  const routeSurface = (kind) => ({ routeSurface: true, routeKind: kind });
+  slab('EXTERIOR_INFILTRATION_TRACK', -34, 80, 5.2, 34, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_track'));
+  // Keep the wide turn outside the north fence, then narrow it to the actual
+  // gate opening. This prevents the road top from appearing beneath wire mesh.
+  slab('EXTERIOR_GATE_DOGLEG', -27, 61.5, 19, 3, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_track'));
+  slab('NORTH_GATE_ENTRY_THROAT', -19, 57.5, 7, 5, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_gate_throat'));
+  slab('COMPOUND_MAINTENANCE_APRON', -10, 44, 36, 22, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_apron'));
+  slab('TREATMENT_HALL_SERVICE_LINK', 5.5, 26, 8.2, 14, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_link'));
+  slab('TREATMENT_HALL_CONCRETE_APPROACH', 5.5, 14, 8.2, 10, CONCRETE_ROUTE_TOP, materials.concrete, routeSurface('concrete_approach'));
+  slab('WEST_APRON_SERVICE_LINK', -24.75, 25.5, 7.5, 15, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_link'));
+  slab('WEST_PROCESS_SERVICE_LANE', -24.75, -10.625, 7.5, 57.25, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_lane'));
+  slab('CROSS_YARD_SERVICE_LANE', -5, -43, 48, 7.5, GRAVEL_ROUTE_TOP, materials.gravel, routeSurface('gravel_lane'));
+  slab('VALVE_HOUSE_CONCRETE_APPROACH', 18, -49.875, 8.5, 6.25, CONCRETE_ROUTE_TOP, materials.concrete, routeSurface('concrete_approach'));
+  slab('VALVE_BACKDOOR_SERVICE_PAD', 3, -86, 12, 10, CONCRETE_ROUTE_TOP, materials.concrete, routeSurface('concrete_pad'));
 
   // The deliberately open north gate sits on the west shoulder. Its centre is
   // twenty-three metres off the process-hall main door, so neither the player
@@ -1133,7 +1215,7 @@ export async function createWorld(scene, renderer) {
   // entry and west service door are physically open and independently usable.
   // There is deliberately no exposed indoor water surface: enclosed pressure
   // vessels, pump skids and overhead manifolds carry the reservoir feed.
-  slab('TREATMENT_HALL_FOUNDATION', -5, -12, 32, 42, 0.11, materials.concrete);
+  slab('TREATMENT_HALL_FOUNDATION', -5, -12, 32, 42, 0.11, materials.concrete, routeSurface('building_foundation'));
   boxMesh('TREATMENT_HALL_WEST_SOUTH', -21, 2.15, -28.6, 0.44, 4.3, 8.8, materials.stucco, { collider: true });
   boxMesh('TREATMENT_HALL_WEST_NORTH', -21, 2.15, -5.4, 0.44, 4.3, 28.8, materials.stucco, { collider: true });
   boxMesh('TREATMENT_HALL_WEST_DOOR_LINTEL', -21, 3.78, -22, 0.44, 1.04, 4.4, materials.stucco, { collider: true });
@@ -1454,7 +1536,7 @@ export async function createWorld(scene, renderer) {
   // Indoor space 2/2: a secured municipal valve vault. Its north control door,
   // south backdoor and internal vault threshold form an offset S-route rather
   // than continuing the process-hall entrance axis.
-  slab('SUPPLY_VALVE_HOUSE_FOUNDATION', 11, -67, 26, 28, 0.11, materials.concrete);
+  slab('SUPPLY_VALVE_HOUSE_FOUNDATION', 11, -67, 26, 28, 0.11, materials.concrete, routeSurface('building_foundation'));
   boxMesh('VALVE_HOUSE_WEST_WALL', -2, 2.15, -67, 0.44, 4.3, 28, materials.stuccoDark, { collider: true });
   boxMesh('VALVE_HOUSE_EAST_WALL', 24, 2.15, -67, 0.44, 4.3, 28, materials.stuccoDark, { collider: true });
   boxMesh('VALVE_HOUSE_SOUTH_WEST', -0.6, 2.15, -81, 2.8, 4.3, 0.44, materials.stuccoDark, { collider: true });
@@ -1829,6 +1911,11 @@ export async function createWorld(scene, renderer) {
     return object;
   }
 
+  const isMaintainedServiceSurface = (x, z, clearance = 0.75) => serviceSurfaces.some((surface) => (
+    x >= surface.minX - clearance && x <= surface.maxX + clearance &&
+    z >= surface.minZ - clearance && z <= surface.maxZ + clearance
+  ));
+
   // Dense, fertile exterior verges built from the actual Poly Haven grass
   // meshes. Candidate cells are fully jittered, deterministically re-ordered,
   // and passed through a spatial minimum-distance filter. Authored moisture
@@ -1871,6 +1958,7 @@ export async function createWorld(scene, renderer) {
         zBase + (hashUnit(key, 0x9e37) - 0.5) * zone.spacing * 0.98,
         zone.minZ + 0.08, zone.maxZ - 0.08,
       );
+      if (isMaintainedServiceSurface(x, z)) return;
       if (zone.trackClearance > 0 && Math.abs(x) < zone.trackClearance) return;
       const clusterStrength = clusterStrengthAt(x, z, zone.clusters);
       const density = THREE.MathUtils.lerp(zone.baseDensity, zone.clusterDensity, clusterStrength);
@@ -2136,7 +2224,8 @@ export async function createWorld(scene, renderer) {
     [-42.2, -57.1], [34.3, -70.6], [-37.8, -82.9], [41.4, -94.2],
     [-33.5, -106.7], [44.1, -103.4], [-51.8, -36.2], [55.6, -63.8],
   ];
-  grassPlacements.forEach(([x, z], index) => natureVariant('grassClump', index, `AUTHORED_GRASS_${index}`, x, z, 2.35 + (index % 4) * 0.24, index * 1.37));
+  const maintainedGrassPlacements = grassPlacements.filter(([x, z]) => !isMaintainedServiceSurface(x, z, 1.2));
+  maintainedGrassPlacements.forEach(([x, z], index) => natureVariant('grassClump', index, `AUTHORED_GRASS_${index}`, x, z, 2.35 + (index % 4) * 0.24, index * 1.37));
   buildExteriorGrassField();
 
   const boulderPlacements = [[-25, 88, 1.1, .5], [25, 82, .92, 2.2], [-35, 63, .95, 4.1], [35, 55, 1.05, 1.5], [-38, -92, 1.15, 3.4]];
@@ -2642,7 +2731,7 @@ export async function createWorld(scene, renderer) {
       westWetVergeGrassClumps: root.userData.west_wet_vergeGrassCount ?? 0,
       eastWetVergeGrassClumps: root.userData.east_wet_vergeGrassCount ?? 0,
       maintainedInteriorFieldClumps: 0,
-      authoredExteriorGrassAccents: grassPlacements.length,
+      authoredExteriorGrassAccents: maintainedGrassPlacements.length,
       grassDistribution: root.userData.exteriorGrassDistribution ?? 'unavailable',
       authoredExteriorTrees: root.userData.authoredExteriorTreeCount ?? 0,
       authoredExteriorRocks: root.userData.authoredExteriorRockCount ?? 0,
@@ -2739,6 +2828,55 @@ export async function createWorld(scene, renderer) {
     }),
   ]);
 
+  const serviceSurfaceOverlapPairs = [];
+  const serviceSurfaceAdjacency = new Map(serviceSurfaces.map((surface) => [surface.id, new Set()]));
+  for (let leftIndex = 0; leftIndex < serviceSurfaces.length; leftIndex += 1) {
+    const left = serviceSurfaces[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < serviceSurfaces.length; rightIndex += 1) {
+      const right = serviceSurfaces[rightIndex];
+      const overlapX = Math.min(left.maxX, right.maxX) - Math.max(left.minX, right.minX);
+      const overlapZ = Math.min(left.maxZ, right.maxZ) - Math.max(left.minZ, right.minZ);
+      if (overlapX > EPSILON && overlapZ > EPSILON) {
+        serviceSurfaceOverlapPairs.push(Object.freeze([left.id, right.id]));
+        continue;
+      }
+      const touchesAcrossX = overlapZ > 0.05 && (
+        Math.abs(left.maxX - right.minX) <= EPSILON || Math.abs(right.maxX - left.minX) <= EPSILON
+      );
+      const touchesAcrossZ = overlapX > 0.05 && (
+        Math.abs(left.maxZ - right.minZ) <= EPSILON || Math.abs(right.maxZ - left.minZ) <= EPSILON
+      );
+      if (!touchesAcrossX && !touchesAcrossZ) continue;
+      serviceSurfaceAdjacency.get(left.id).add(right.id);
+      serviceSurfaceAdjacency.get(right.id).add(left.id);
+    }
+  }
+  const connectedServiceSurfaceIds = new Set();
+  const serviceSurfaceQueue = serviceSurfaces.length ? [serviceSurfaces[0].id] : [];
+  while (serviceSurfaceQueue.length) {
+    const id = serviceSurfaceQueue.shift();
+    if (connectedServiceSurfaceIds.has(id)) continue;
+    connectedServiceSurfaceIds.add(id);
+    for (const neighbor of serviceSurfaceAdjacency.get(id) ?? []) {
+      if (!connectedServiceSurfaceIds.has(neighbor)) serviceSurfaceQueue.push(neighbor);
+    }
+  }
+  const disconnectedServiceSurfaceIds = serviceSurfaces
+    .map((surface) => surface.id)
+    .filter((id) => !connectedServiceSurfaceIds.has(id));
+  const serviceSurfaceNetwork = Object.freeze({
+    surfaces: Object.freeze(serviceSurfaces.map((surface) => Object.freeze({ ...surface }))),
+    joins: Object.freeze([...serviceSurfaceAdjacency.entries()].flatMap(([id, neighbors]) => (
+      [...neighbors]
+        .filter((neighbor) => id.localeCompare(neighbor) < 0)
+        .map((neighbor) => Object.freeze([id, neighbor]))
+    ))),
+    overlapPairs: Object.freeze(serviceSurfaceOverlapPairs),
+    disconnectedSurfaceIds: Object.freeze(disconnectedServiceSurfaceIds),
+    allSurfacesConnected: disconnectedServiceSurfaceIds.length === 0,
+    noCoplanarOverlaps: serviceSurfaceOverlapPairs.length === 0,
+  });
+
   const pipeNodeDegrees = new Map([...pipeNodeMap.keys()].map((id) => [id, 0]));
   pipeRuns.forEach((run) => {
     pipeNodeDegrees.set(run.from, (pipeNodeDegrees.get(run.from) ?? 0) + 1);
@@ -2768,6 +2906,14 @@ export async function createWorld(scene, renderer) {
   const unsupportedHorizontalRunIds = pipeRuns
     .filter((run) => run.horizontal && run.supportIds.length === 0)
     .map((run) => run.id);
+  const misseatedSupportIds = pipeSupports
+    .filter((support) => (
+      Math.abs(support.cradleContactGap ?? Infinity) > 0.001
+      || (support.kind === 'rack' && support.footPositions.length !== 2)
+      || (support.kind === 'floor' && support.footPositions.length !== 1)
+      || (support.kind === 'hanger' && support.anchorPositions.length !== 2)
+    ))
+    .map((support) => support.id);
   const coincidentRunPairs = [];
   for (let leftIndex = 0; leftIndex < pipeRuns.length; leftIndex += 1) {
     const left = pipeRuns[leftIndex];
@@ -2876,10 +3022,12 @@ export async function createWorld(scene, renderer) {
     backdoorOutletNodeId: buriedCityConnectionNodeId,
     danglingNodeIds: Object.freeze(danglingPipeNodeIds),
     unsupportedHorizontalRunIds: Object.freeze(unsupportedHorizontalRunIds),
+    misseatedSupportIds: Object.freeze(misseatedSupportIds),
     coincidentRunPairs: Object.freeze(coincidentRunPairs),
     sourcePaths: Object.freeze(sourcePathEvidence),
     allRunEndpointsTerminated: danglingPipeNodeIds.length === 0,
     allExposedHorizontalRunsSupported: unsupportedHorizontalRunIds.length === 0,
+    allSupportsPhysicallySeated: misseatedSupportIds.length === 0,
     noCoincidentRuns: coincidentRunPairs.length === 0,
     allWallPenetrationsCollared: PIPE_NETWORK_CONTRACT.wallPenetrationIds.every((id) => (
       pipeWallPenetrations.some((penetration) => penetration.id === id && penetration.collarId)
@@ -2918,6 +3066,8 @@ export async function createWorld(scene, renderer) {
     supports: Object.freeze(pipeSupports.map((support) => Object.freeze({
       ...support,
       position: freezePosition(support.position),
+      footPositions: Object.freeze(support.footPositions.map(freezePosition)),
+      anchorPositions: Object.freeze(support.anchorPositions.map(freezePosition)),
     }))),
     wallPenetrations: Object.freeze(pipeWallPenetrations.map((penetration) => Object.freeze({ ...penetration }))),
     equipmentLinks: Object.freeze(pipeEquipmentLinks.map((link) => Object.freeze({
@@ -2944,6 +3094,7 @@ export async function createWorld(scene, renderer) {
     facilityTopology,
     missionTargets,
     reconTargets,
+    serviceSurfaceNetwork,
     pipeNetwork,
     reinforcementSpawns,
     boundary,
@@ -2982,6 +3133,7 @@ export async function createWorld(scene, renderer) {
     facilityTopology,
     missionTargets,
     reconTargets,
+    serviceSurfaceNetwork,
     pipeNetwork,
     reinforcementSpawns,
     authoredRosterIds,

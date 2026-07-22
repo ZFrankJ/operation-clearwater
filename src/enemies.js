@@ -81,6 +81,7 @@ const CASUALTY_IMMEDIATE_RANGE = 22;
 const FALLEN_BODY_LENGTH = 1.72;
 const FALLEN_BODY_RADIUS = 0.26;
 const FALLEN_BODY_HEIGHT = 0.52;
+const FALLEN_BODY_SURFACE_CLEARANCE = 0.16;
 const WEAPON_WALL_RETRACT = 0.72;
 const WEAPON_WALL_LOWER = 0.18;
 const WEAPON_VISUAL_REACH = 0.9;
@@ -3237,6 +3238,22 @@ export class EnemyDirector {
     };
   }
 
+  _fallenBodySurfaceHeight(rootPosition, direction) {
+    let supportHeight = rootPosition.y;
+    // A prone character spans far more than its standing footprint. Sample the
+    // complete landing lane and use its highest walkable surface so a body
+    // crossing a road edge cannot sink into the higher slab.
+    for (let sampleIndex = 0; sampleIndex <= 8; sampleIndex += 1) {
+      const sample = rootPosition.clone().addScaledVector(
+        direction,
+        FALLEN_BODY_LENGTH * (sampleIndex / 8),
+      );
+      const height = this._groundHeightAt(sample.x, sample.z, rootPosition.y + 0.55);
+      if (Number.isFinite(height)) supportHeight = Math.max(supportHeight, height);
+    }
+    return supportHeight;
+  }
+
   _chooseDeathPose(enemy) {
     const start = enemy.root.position.clone();
     enemy.root.getWorldDirection(this._a).setY(0);
@@ -3257,12 +3274,15 @@ export class EnemyDirector {
         for (let directionIndex = 0; directionIndex < 16; directionIndex += 1) {
           const angle = preferredAngle + (directionIndex / 16) * Math.PI * 2;
           const direction = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
-          const clearance = this._fallenBodyClearance(targetPosition, direction);
+          const supportedPosition = targetPosition.clone().setY(
+            this._fallenBodySurfaceHeight(targetPosition, direction),
+          );
+          const clearance = this._fallenBodyClearance(supportedPosition, direction);
           const preference = direction.dot(this._a) * 0.18;
           const score = (clearance.clear ? 100 : 0) - clearance.overlap * 38 +
             clearance.minimumClearance + preference - shiftRadius * 0.7;
           if (best && score <= best.score) continue;
-          best = { score, targetPosition, direction, ...clearance };
+          best = { score, targetPosition: supportedPosition, direction, ...clearance };
         }
       }
     }
@@ -3309,7 +3329,7 @@ export class EnemyDirector {
         targetPosition: deathPose.targetPosition.clone()
           .add(new THREE.Vector3(-deathPose.direction.z, 0, deathPose.direction.x).multiplyScalar(side * 0.48))
           .addScaledVector(deathPose.direction, 0.62)
-          .setY(deathPose.targetPosition.y + 0.075),
+          .setY(deathPose.targetPosition.y + 0.105),
         targetQuaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(
           0.04,
           enemy.root.rotation.y + side * 0.28,
@@ -3324,7 +3344,7 @@ export class EnemyDirector {
       startPosition: enemy.root.position.clone(),
       targetPosition: deathPose.targetPosition.clone(),
       startQuaternion: enemy.root.quaternion.clone(),
-      settleHeight: 0.045,
+      settleHeight: FALLEN_BODY_SURFACE_CLEARANCE,
       targetQuaternion: deathPose.targetQuaternion,
       fallDirection: deathPose.direction.clone(),
       collisionFree: deathPose.collisionFree,
@@ -3437,8 +3457,8 @@ export class EnemyDirector {
     const t = easeOutCubic(enemy.death.time / enemy.death.duration);
     enemy.root.quaternion.slerpQuaternions(enemy.death.startQuaternion, enemy.death.targetQuaternion, t);
     enemy.root.position.lerpVectors(enemy.death.startPosition, enemy.death.targetPosition, t);
-    // A small lift clears the back/vest from terrain during the fall, then the
-    // body settles just above ground rather than clipping or hovering.
+    // Lift the rotated rig through the fall, then retain a measured prone-body
+    // clearance above the highest road/foundation/terrain sample below it.
     enemy.root.position.y += Math.sin(Math.PI * t) * 0.035 + enemy.death.settleHeight * t;
     const drop = enemy.death.weaponDrop;
     if (drop && enemy.weaponMount) {
@@ -3701,6 +3721,7 @@ export class EnemyDirector {
     for (const name of methods) {
       if (typeof this.world?.[name] !== 'function') continue;
       const y = this.world[name](x, z, currentY);
+      if (y == null) continue;
       if (Number.isFinite(Number(y))) return Number(y);
     }
     return currentY;
